@@ -1,0 +1,547 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum StrategyStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum RuleInputType {
+  YES_NO
+  SINGLE_SELECT
+  MULTI_SELECT
+  NUMBER
+  PERCENTAGE
+  CURRENCY
+  TEXT
+  LONG_TEXT
+  DATE_TIME
+  SCREENSHOT_REQUIRED
+  ATTACHMENT_REQUIRED
+  CONDITIONAL
+  INFORMATION
+}
+
+enum CandidateLifecycle {
+  PREPARING
+  QUALIFIED
+  REJECTED
+  EXPIRED
+  ARCHIVED
+}
+
+enum CandidateDisposition {
+  NONE
+  TRADED
+  MISSED
+  CORRECT_NO_TRADE
+  CANCELLED
+}
+
+enum GateResult {
+  IN_PROGRESS
+  PASSED
+  REJECTED
+}
+
+enum DiagnosticCompletion {
+  PARTIAL
+  COMPLETE
+}
+
+enum LockState {
+  DRAFT
+  LOCKED
+}
+
+enum GradeLetter {
+  C
+  B
+  A
+  A_PLUS
+}
+
+enum TradeStatus {
+  ACTIVE
+  CLOSED
+  ARCHIVED
+}
+
+enum ReviewStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETE
+}
+
+model Strategy {
+  id          String            @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  versions    StrategyVersion[]
+}
+
+model StrategyVersion {
+  id                    String           @id @default(cuid())
+  strategyId            String
+  strategy              Strategy         @relation(fields: [strategyId], references: [id], onDelete: Restrict)
+  versionNumber         Int
+  status                StrategyStatus   @default(DRAFT)
+  effectiveDate         DateTime?
+  configuration         String
+  changeSummary         String?
+  createdAt             DateTime         @default(now())
+  publishedAt           DateTime?
+  parentVersionId       String?
+  parentVersion         StrategyVersion? @relation("VersionParent", fields: [parentVersionId], references: [id], onDelete: Restrict)
+  childVersions         StrategyVersion[] @relation("VersionParent")
+  rules                 StrategyRule[]
+  gates                 GateDefinition[]
+  gradeCategories       GradeCategory[]
+  entryModels           EntryModel[]
+  emotionalQuestions    EmotionalQuestion[]
+  emotionalAssessments  EmotionalAssessment[]
+  dailyPlans            DailyPlan[]
+  candidates            SetupCandidate[]
+  trades                Trade[]
+  journalOptions        JournalOption[]
+  instrumentMetadata    InstrumentMetadata[]
+
+  @@unique([strategyId, versionNumber])
+}
+
+model StrategyRule {
+  id                String          @id @default(cuid())
+  strategyVersionId String
+  strategyVersion   StrategyVersion @relation(fields: [strategyVersionId], references: [id], onDelete: Cascade)
+  ruleId            String
+  title             String
+  description       String?
+  category          String
+  mandatory         Boolean         @default(false)
+  inputType         RuleInputType   @default(TEXT)
+  allowedAnswers    String?
+  defaultAnswer     String?
+  failureBehaviour  String?
+  evidenceRequired  Boolean         @default(false)
+  helpText          String?
+  validExample      String?
+  invalidExample    String?
+  displayOrder      Int
+  active            Boolean         @default(true)
+  ownerNotes        String?
+
+  @@unique([strategyVersionId, ruleId])
+}
+
+model GateDefinition {
+  id                String          @id @default(cuid())
+  strategyVersionId String
+  strategyVersion   StrategyVersion @relation(fields: [strategyVersionId], references: [id], onDelete: Cascade)
+  gateKey           String
+  title             String
+  explanation       String?
+  yesCriteria       String?
+  noCriteria        String?
+  evidence          String?
+  timeframe         String?
+  validExample      String?
+  invalidExample    String?
+  displayOrder      Int
+  active            Boolean         @default(true)
+
+  @@unique([strategyVersionId, gateKey])
+}
+
+model GradeCategory {
+  id                String          @id @default(cuid())
+  strategyVersionId String
+  strategyVersion   StrategyVersion @relation(fields: [strategyVersionId], references: [id], onDelete: Cascade)
+  categoryKey       String
+  title             String
+  scoreOne          String
+  scoreTwo          String
+  evidence          String?
+  helpText          String?
+  examples          String?
+  displayOrder      Int
+  active            Boolean         @default(true)
+
+  @@unique([strategyVersionId, categoryKey])
+}
+
+model EntryModel {
+  id                String          @id @default(cuid())
+  strategyVersionId String
+  strategyVersion   StrategyVersion @relation(fields: [strategyVersionId], references: [id], onDelete: Cascade)
+  code              String
+  name              String
+  shortDescription  String?
+  fields            String
+  active            Boolean         @default(true)
+
+  @@unique([strategyVersionId, code])
+}
+
+model DailyPlan {
+  id                String           @id @default(cuid())
+  strategyVersionId String
+  strategyVersion   StrategyVersion  @relation(fields: [strategyVersionId], references: [id], onDelete: Restrict)
+  planDate          DateTime
+  account           String
+  sessionLabels     String
+  riskMode          String
+  reducedRiskReason String?
+  newsNotes         String?
+  objective         String?
+  maxRisk           Float?
+  maxTradeTheses    Int              @default(2)
+  readinessNotes    String?
+  status            String           @default("DRAFT")
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  instruments       InstrumentPlan[]
+  candidates        SetupCandidate[]
+}
+
+model InstrumentPlan {
+  id               String    @id @default(cuid())
+  dailyPlanId      String
+  dailyPlan        DailyPlan @relation(fields: [dailyPlanId], references: [id], onDelete: Cascade)
+  instrument       String
+  bias             String
+  confidence       String?
+  archetype        String?
+  macroNarrative   String?
+  profileLevels    String?
+  permittedModels  String
+  scenarios        String
+  invalidation     String?
+}
+
+model SetupCandidate {
+  id                String               @id @default(cuid())
+  strategyVersionId String
+  strategyVersion   StrategyVersion      @relation(fields: [strategyVersionId], references: [id], onDelete: Restrict)
+  dailyPlanId       String?
+  dailyPlan         DailyPlan?           @relation(fields: [dailyPlanId], references: [id], onDelete: SetNull)
+  account           String
+  instrument        String
+  sessionLabel      String
+  direction         String
+  archetype         String?
+  entryModel        String?
+  profileType       String?
+  profileLevel      String?
+  zoneTimeframe     String?
+  thesis            String?
+  expectedPath      String?
+  plannedEntry      Float?
+  plannedStop       Float?
+  plannedTarget     Float?
+  plannedRisk       Float?
+  plannedPositionSize Float?
+  instrumentLabel       String?
+  entryTimeframe        String?
+  entryTimeframeSeconds Int?
+  entryTimeframeCustom  String?
+  biasEvaluation        Int?
+  biasEvaluationNote    String?
+  entryEvaluation       Int?
+  entryEvaluationNote   String?
+  noEntryModelExplanation String?
+  lifecycle         CandidateLifecycle   @default(PREPARING)
+  disposition       CandidateDisposition @default(NONE)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  gateAssessment    GateAssessment?
+  grade             SetupGrade?
+  trade             Trade?
+  evidence          Evidence[]
+  optionSelections  CandidateOptionSelection[]
+  targets           CandidateTarget[]
+}
+
+model GateAssessment {
+  id                   String               @id @default(cuid())
+  candidateId          String               @unique
+  candidate            SetupCandidate       @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  result               GateResult           @default(IN_PROGRESS)
+  diagnosticCompletion DiagnosticCompletion @default(PARTIAL)
+  lockState            LockState            @default(DRAFT)
+  firstFailedGateKey   String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  responses            GateResponse[]
+  emotionalAssessment  EmotionalAssessment?
+}
+
+model GateResponse {
+  id                String         @id @default(cuid())
+  assessmentId      String
+  assessment        GateAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  gateKey           String
+  answer            Boolean
+  notes             String?
+  answeredAt        DateTime       @default(now())
+
+  @@unique([assessmentId, gateKey])
+}
+
+model EmotionalQuestion {
+  id                String          @id @default(cuid())
+  strategyVersionId String
+  strategyVersion   StrategyVersion @relation(fields: [strategyVersionId], references: [id], onDelete: Cascade)
+  questionId        String
+  wording           String
+  displayOrder      Int
+  active            Boolean         @default(true)
+  hardBlock         Boolean         @default(false)
+
+  @@unique([strategyVersionId, questionId])
+}
+
+model EmotionalAssessment {
+  id                    String               @id @default(cuid())
+  assessmentId          String               @unique
+  assessment            GateAssessment       @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  strategyVersionId     String
+  strategyVersion       StrategyVersion      @relation(fields: [strategyVersionId], references: [id], onDelete: Restrict)
+  totalQuestions        Int
+  answeredQuestions     Int                  @default(0)
+  passedQuestions       Int                  @default(0)
+  failedQuestions       Int                  @default(0)
+  firstFailedQuestionId String?
+  result                GateResult           @default(IN_PROGRESS)
+  diagnosticCompletion  DiagnosticCompletion @default(PARTIAL)
+  lockState             LockState            @default(DRAFT)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  responses             EmotionalResponse[]
+}
+
+model EmotionalResponse {
+  id                    String             @id @default(cuid())
+  emotionalAssessmentId String
+  emotionalAssessment   EmotionalAssessment @relation(fields: [emotionalAssessmentId], references: [id], onDelete: Cascade)
+  gateResponseId        String?
+  questionId            String
+  questionTextSnapshot  String
+  answer                Boolean
+  note                  String?
+  currentEmotion        String?
+  trigger               String?
+  previousTradeResult   String?
+  explanation           String?
+  correctiveAction      String?
+  answeredAt            DateTime           @default(now())
+
+  @@unique([emotionalAssessmentId, questionId])
+}
+
+model SetupGrade {
+  id            String         @id @default(cuid())
+  candidateId   String         @unique
+  candidate     SetupCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  scores        String
+  total         Int
+  letter        GradeLetter
+  notes         String?
+  lockedAt      DateTime?
+  originalTotal Int?
+  correctedAt   DateTime?
+  correctionReason String?
+}
+
+model Trade {
+  id                    String         @id @default(cuid())
+  candidateId           String         @unique
+  candidate             SetupCandidate @relation(fields: [candidateId], references: [id], onDelete: Restrict)
+  strategyVersionId     String
+  strategyVersion       StrategyVersion @relation(fields: [strategyVersionId], references: [id], onDelete: Restrict)
+  account               String
+  instrument            String
+  direction             String
+  entryModel            String?
+  gradeLetter           GradeLetter?
+  restrictionReason     String?
+  status                TradeStatus    @default(ACTIVE)
+  entryPrice            Float?
+  stopPrice             Float?
+  targetPrice           Float?
+  positionSize          Float?
+  riskPercent           Float?
+  riskAmount            Float?
+  plannedR              Float?
+  technicalInvalidation String?
+  entryTimestamp        DateTime       @default(now())
+  netResult             Float?
+  executedRisk          Float?
+  plannedCapitalRisk    Float?
+  maximumRisk           Float?
+  executedR             Float?
+  plannedCapitalR       Float?
+  maximumRiskR          Float?
+  exitPrice             Float?
+  exitTimestamp         DateTime?
+  closeStatus           String?
+  manualExitReason      String?
+  durationSeconds       Int?
+  durationSource        String?
+  grossPnl              Float?
+  fees                  Float?
+  commission            Float?
+  swapFunding           Float?
+  calculationCurrency   String?
+  pnlMethod             String?
+  pnlPrecision          String?
+  pnlFormula            String?
+  pnlOverrideReason     String?
+  createdAt             DateTime       @default(now())
+  legs                  TradeLeg[]
+  review                TradeReview?
+  evidence              Evidence[]
+}
+
+model JournalOption {
+  id                String           @id @default(cuid())
+  strategyVersionId String?
+  strategyVersion   StrategyVersion? @relation(fields: [strategyVersionId], references: [id], onDelete: Restrict)
+  category          String
+  value             String
+  label             String
+  colour            String?
+  displayOrder      Int
+  active            Boolean          @default(true)
+  archivedAt        DateTime?
+  custom            Boolean          @default(false)
+  createdAt         DateTime         @default(now())
+
+  selections        CandidateOptionSelection[]
+  @@unique([strategyVersionId, category, value])
+}
+
+model CandidateOptionSelection {
+  id                  String          @id @default(cuid())
+  candidateId         String
+  candidate           SetupCandidate  @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  optionId            String?
+  option              JournalOption?  @relation(fields: [optionId], references: [id], onDelete: SetNull)
+  category            String
+  valueSnapshot       String
+  labelSnapshot       String
+  colourSnapshot      String?
+  note                String?
+  evidence            String?
+  displayOrder        Int             @default(0)
+  createdAt           DateTime        @default(now())
+}
+
+model CandidateTarget {
+  id            String         @id @default(cuid())
+  candidateId   String
+  candidate     SetupCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  label         String
+  price         Float?
+  primary       Boolean        @default(false)
+  displayOrder  Int            @default(0)
+  note          String?
+}
+
+model InstrumentMetadata {
+  id                  String           @id @default(cuid())
+  strategyVersionId   String?
+  strategyVersion     StrategyVersion? @relation(fields: [strategyVersionId], references: [id], onDelete: Restrict)
+  symbol              String
+  displayName         String
+  aliases             String?
+  assetClass          String
+  tradingFormat       String
+  quoteCurrency       String?
+  accountCurrency     String?
+  pipSize             Float?
+  tickSize            Float?
+  pipValue            Float?
+  tickValue           Float?
+  contractSize        Float?
+  contractMultiplier  Float?
+  quantityUnit        String?
+  pricePrecision      Int?
+  quantityPrecision   Int?
+  active              Boolean          @default(true)
+  calculationSupported Boolean         @default(false)
+  metadataSource      String?
+  metadataNotes       String?
+
+  @@unique([strategyVersionId, symbol])
+}
+
+model TradeLeg {
+  id          String   @id @default(cuid())
+  tradeId     String
+  trade       Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  entryPrice  Float
+  timestamp   DateTime @default(now())
+  quantity    Float
+  stopPrice   Float
+  initialRisk Float
+  screenshot  String?
+  reason      String?
+  planned     Boolean  @default(true)
+  entryModel  String?
+}
+
+model TradeReview {
+  id              String       @id @default(cuid())
+  tradeId         String       @unique
+  trade           Trade        @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  status          ReviewStatus @default(IN_PROGRESS)
+  takeAgain       Boolean?
+  outcome         String?
+  classification  String?
+  executionGrade  String?
+  managementGrade String?
+  answers         String
+  primaryMistake  String?
+  secondaryMistakes String?
+  preventionRule  String?
+  lesson          String?
+  postTradeReview String?
+  lastSavedAt     DateTime?
+  completedAt     DateTime?
+}
+
+model Evidence {
+  id          String          @id @default(cuid())
+  candidateId String?
+  candidate   SetupCandidate? @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  tradeId     String?
+  trade       Trade?          @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  filename    String
+  mimeType    String
+  capturedAt  DateTime?
+  uploadedAt  DateTime        @default(now())
+  late        Boolean         @default(false)
+  label       String?
+}
+
+model AuditEvent {
+  id          String   @id @default(cuid())
+  actor       String   @default("owner")
+  timestamp   DateTime @default(now())
+  entityType  String
+  entityId    String
+  action      String
+  previous    String?
+  next        String?
+  reason      String?
+  metadata    String?
+}
