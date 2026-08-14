@@ -173,12 +173,11 @@ export async function createCandidate(formData: FormData) {
   const selectedOptionIds = formData.getAll("optionIds").map(String);
   const selectedOptions = await prisma.journalOption.findMany({ where: { id: { in: selectedOptionIds }, strategyVersionId: input.strategyVersionId, active: true, archivedAt: null } });
   const primaryTarget = String(formData.get("primaryTarget") || "");
-  const targetIds = formData.getAll("targetIds").map(String);
+  const targetIds = [...new Set([...formData.getAll("targetIds").map(String), ...(primaryTarget && primaryTarget !== "custom" ? [primaryTarget] : [])])];
   const selectedTargets = await prisma.journalOption.findMany({ where: { id: { in: targetIds }, strategyVersionId: input.strategyVersionId, category: "TARGET", active: true, archivedAt: null }, orderBy: { displayOrder: "asc" } });
   const customTargetLabel = String(formData.get("customTargetLabel") || "").trim();
   const customTargetPrice = number(formData.get("customTargetPrice"));
   if (customTargetPrice !== undefined && customTargetPrice <= 0) throw new Error("Custom target price must be positive.");
-  if (primaryTarget && primaryTarget !== "custom" && !selectedTargets.some((target) => target.id === primaryTarget)) throw new Error("Primary target must be one of the selected targets.");
   if (primaryTarget === "custom" && !customTargetLabel) throw new Error("A custom primary target needs a label.");
   const candidate = await prisma.setupCandidate.create({ data: { strategyVersionId: input.strategyVersionId, account: input.account, instrument: input.instrument.replaceAll("/", ""), instrumentLabel: String(formData.get("instrumentLabel") || input.instrument), sessionLabel: input.sessionLabel, direction: input.direction, archetype: input.archetype || null, entryModel: input.entryModel || null, thesis: input.thesis || null, dailyPlanId: String(formData.get("dailyPlanId") || "") || null, entryTimeframe: input.entryTimeframe, entryTimeframeSeconds: timeframeSeconds[input.entryTimeframe] ?? null, entryTimeframeCustom: input.entryTimeframe === "Custom" ? customTimeframe : null, biasEvaluation: input.biasEvaluation, biasEvaluationNote: String(formData.get("biasEvaluationNote") || "") || null, entryEvaluation: input.entryEvaluation ?? null, entryEvaluationNote: String(formData.get("entryEvaluationNote") || "") || null, noEntryModelExplanation: noModelExplanation || null, plannedEntry: number(formData.get("plannedEntry")), plannedStop: number(formData.get("plannedStop")), plannedTarget: number(formData.get("plannedTarget")), plannedRisk: number(formData.get("plannedRisk")), plannedPositionSize: number(formData.get("plannedPositionSize")), optionSelections: { create: selectedOptions.map((option, index) => ({ optionId: option.id, category: option.category, valueSnapshot: option.value, labelSnapshot: option.label, colourSnapshot: option.colour, note: String(formData.get(`${option.id}-note`) || "") || null, evidence: String(formData.get(`${option.id}-evidence`) || "") || null, displayOrder: index })) }, targets: { create: [...selectedTargets.map((target, index) => ({ label: target.label, primary: primaryTarget === target.id, displayOrder: index })), ...(customTargetLabel ? [{ label: customTargetLabel, price: customTargetPrice ?? null, primary: primaryTarget === "custom", displayOrder: selectedTargets.length, note: String(formData.get("targetNotes") || "") || null }] : [])] }, gateAssessment: { create: {} } } });
   if (noEntryModel(input.entryModel)) await audit("SetupCandidate", candidate.id, "NO_ENTRY_MODEL_SELECTED", noModelExplanation, undefined, { entryModel: input.entryModel, mistakes: ["PROCESS", "EM"] });
@@ -367,6 +366,25 @@ export async function addTradeLeg(formData: FormData) {
   const leg = await prisma.tradeLeg.create({ data: { tradeId, entryPrice: Number(formData.get("entryPrice")), quantity: Number(formData.get("quantity")), stopPrice: Number(formData.get("stopPrice")), initialRisk: Number(formData.get("initialRisk")), screenshot: String(formData.get("screenshot") || "") || null, reason: String(formData.get("reason") || ""), planned: input.planned, entryModel: String(formData.get("entryModel") || "") || null } });
   await audit("TradeLeg", leg.id, input.planned ? "ADD_ON_CREATED" : "ADD_ON_MARKED_UNPLANNED");
   revalidatePath(`/review?trade=${tradeId}`);
+}
+
+export async function deleteStrategyVersion(formData: FormData) {
+  await assertOwner();
+  const versionId = z.string().parse(formData.get("versionId"));
+  const version = await prisma.strategyVersion.findUniqueOrThrow({ where: { id: versionId }, select: { strategyId: true, _count: { select: { childVersions: true } } } });
+  if (version._count.childVersions > 0) throw new Error("Cannot delete a version that has child versions.");
+  await prisma.$transaction(async (tx) => {
+    await tx.trade.deleteMany({ where: { strategyVersionId: versionId } });
+    await tx.setupCandidate.deleteMany({ where: { strategyVersionId: versionId } });
+    await tx.dailyPlan.deleteMany({ where: { strategyVersionId: versionId } });
+    await tx.journalOption.deleteMany({ where: { strategyVersionId: versionId } });
+    await tx.instrumentMetadata.deleteMany({ where: { strategyVersionId: versionId } });
+    await tx.strategyVersion.delete({ where: { id: versionId } });
+  });
+  const remaining = await prisma.strategyVersion.count({ where: { strategyId: version.strategyId } });
+  if (remaining === 0) await prisma.strategy.delete({ where: { id: version.strategyId } });
+  revalidatePath("/strategy");
+  redirect("/strategy");
 }
 
 export async function completeReview(formData: FormData) {
