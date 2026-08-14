@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { Shell } from "@/components/shell";
 import { prisma } from "@/lib/prisma";
+import { guardPage } from "@/lib/supabase/page-guard";
 
 export const dynamic = "force-dynamic";
 
 export default async function JournalPage({ searchParams }: { searchParams: Promise<{ date?: string; month?: string }> }) {
+  await guardPage();
   const scope = await searchParams;
   const candidates = await prisma.setupCandidate.findMany({ include: { gateAssessment: true, grade: true, trade: true, strategyVersion: true }, orderBy: { updatedAt: "desc" } });
   const visible = scope.date ? candidates.filter((item) => item.createdAt.toISOString().slice(0, 10) === scope.date) : scope.month && /^\d{4}-\d{2}$/.test(scope.month) ? candidates.filter((item) => item.createdAt.toISOString().slice(0, 7) === scope.month) : candidates;

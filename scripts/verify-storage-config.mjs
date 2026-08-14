@@ -1,0 +1,11 @@
+import { createClient } from "@supabase/supabase-js";
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const bucket = process.env.SUPABASE_STORAGE_BUCKET || "evidence-private";
+if (!url) throw new Error("NEXT_PUBLIC_SUPABASE_URL is missing.");
+const secret = process.env.SUPABASE_SECRET_KEY;
+if (!secret) throw new Error("SUPABASE_SECRET_KEY is missing.");
+const client = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+const { data, error } = await client.storage.getBucket(bucket);
+if (error || !data) throw new Error("The configured evidence bucket could not be verified.");
+console.log(JSON.stringify({ bucketConfigured: true, bucketExists: true, isPublic: data.public === true, fileSizeLimitConfigured: Boolean(data.file_size_limit), allowedMimeTypesConfigured: Array.isArray(data.allowed_mime_types) }));
+if (data.public === true) process.exitCode = 1;

@@ -1,9 +1,12 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { dashboardFilters, dateRange } from "@/lib/dashboard-filters";
+import { requireOwner } from "@/lib/supabase/server";
 
 const cell = (value: string | number | null | undefined) => `"${String(value ?? "").replaceAll('"', '""')}"`;
 export async function GET(request: NextRequest) {
+  const owner = await requireOwner();
+  if (owner.status !== "ok") return new Response(owner.status === "unauthenticated" ? "Unauthorized" : "Forbidden", { status: owner.status === "unauthenticated" ? 401 : 403 });
   const filters = dashboardFilters(Object.fromEntries(request.nextUrl.searchParams.entries())); const range = dateRange(filters);
   if (!range.valid) return new Response("Custom start date must be before the end date.", { status: 400 });
   const trades = await prisma.trade.findMany({ where: { status: "CLOSED" }, include: { candidate: { include: { optionSelections: true, targets: true } }, strategyVersion: { include: { strategy: true } }, review: true }, orderBy: { createdAt: "desc" } });

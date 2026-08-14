@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { Shell } from "@/components/shell";
-import { AnalyticsGrid, AnalyticsPanel, EmptyState, JournalCalendar, MetricCell, MetricStrip, MiniChart, ProgressLine, StatusBadge } from "@/components/ledger-ui";
+import { AnalyticsGrid, AnalyticsPanel, EmptyState, JournalCalendar, LedgerScorePanel, MetricCell, MetricStrip, MiniChart, ProgressLine, StatusBadge } from "@/components/ledger-ui";
+import { PerformanceDashboard } from "@/components/performance-dashboard";
 import { DashboardControls } from "@/components/dashboard-controls";
 import { AnalysisDashboard } from "@/components/analysis-dashboard";
 import { dashboardFilters, dateRange } from "@/lib/dashboard-filters";
 import { prisma } from "@/lib/prisma";
+import { guardPage } from "@/lib/supabase/page-guard";
 import styles from "./home.module.css";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +16,7 @@ const formatR = (value: number | null | undefined) => value == null ? "—" : `$
 const stamp = (value: Date) => new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(value);
 
 export default async function Home({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  await guardPage();
   const now = new Date();
   const filters = dashboardFilters(await searchParams, now); const selectedRange = dateRange(filters, now);
   const [strategy, plans, candidates, allTrades, audits, drafts, versions] = await Promise.all([
@@ -60,6 +63,27 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   const incompleteDiagnostics = candidates.filter((candidate) => candidate.gateAssessment?.result === "REJECTED" && candidate.gateAssessment.diagnosticCompletion === "PARTIAL");
   const missingEvidence = candidates.filter((candidate) => candidate.evidence.length === 0).slice(0, 2);
   const config = strategy ? JSON.parse(strategy.configuration) as { riskBasis?: string | null } : null;
+
+  // Performance dashboard metrics
+  const grossWins = winning.reduce((s, v) => s + v, 0);
+  const grossLosses = Math.abs(losing.reduce((s, v) => s + v, 0));
+  const profitFactorValue = grossLosses > 0 ? grossWins / grossLosses : null;
+  const avgWin = winning.length ? grossWins / winning.length : null;
+  const avgLoss = losing.length ? grossLosses / losing.length : null;
+  const winRateRaw = executedValues.length ? winning.length / executedValues.length * 100 : null;
+  const maxDD = drawdown.length ? Math.min(...drawdown) : 0;
+  const totalR = cumulative.at(-1) ?? 0;
+  const recoveryFactor = maxDD < 0 ? totalR / Math.abs(maxDD) : null;
+  const mean = averageR ?? 0;
+  const variance = executedValues.length > 1 ? executedValues.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / executedValues.length : 0;
+  const stdDev = Math.sqrt(variance);
+  const sharpeRatio = executedValues.length > 1 && stdDev > 0 ? mean / stdDev : null;
+  const downsideDev = Math.sqrt(executedValues.filter(v => v < 0).reduce((s, v) => s + v * v, 0) / Math.max(executedValues.length, 1));
+  const sortino = executedValues.length > 1 && downsideDev > 0 ? mean / downsideDev : null;
+  const cv = mean !== 0 && stdDev > 0 ? stdDev / Math.abs(mean) : 1;
+  const consistencyScore = Math.max(0, Math.min(100, Math.round(100 - cv * 30)));
+  const currentDrawdown = drawdown.at(-1) ?? 0;
+  const tradeDates = weeklyTrades.map(t => new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short" }).format(t.createdAt));
   const reviewQueue = [
     ...pendingReviews.map((trade) => ({ id: trade.id, kind: "Review", title: `${trade.instrument} needs post-trade review`, detail: trade.candidate.thesis || "Closed trade awaiting review", href: "/review", tone: "warning" as const, time: stamp(trade.createdAt) })),
     ...incompleteDiagnostics.map((candidate) => ({ id: candidate.id, kind: "Gate", title: `${candidate.instrument} diagnostics incomplete`, detail: `First failed ${candidate.gateAssessment?.firstFailedGateKey ?? "gate"}`, href: `/journal/${candidate.id}`, tone: "danger" as const, time: stamp(candidate.updatedAt) })),
@@ -77,14 +101,14 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
       <DashboardControls tab={filters.tab} source={filters.source} account={filters.account} strategy={filters.strategy} version={filters.version} instrument={filters.instrument} setupType={filters.setupType} entryModel={filters.entryModel} grade={filters.grade} validity={filters.validity} direction={filters.direction} session={filters.session} closeStatus={filters.closeStatus} mistake={filters.mistake} range={filters.range} start={filters.start} end={filters.end} group={filters.group} accounts={[...new Set([...allTrades.map((trade) => trade.account), ...plans.map((item) => item.account)])].map((value) => ({ value, label: value.includes("Demo") ? `${value} · demo` : value }))} strategies={[...new Map(versions.map((item) => [item.strategy.id, { value: item.strategy.id, label: item.strategy.name }])).values()]} versions={versions.map((item) => ({ value: item.id, label: `${item.strategy.name} · v${item.versionNumber} · ${item.status}` }))} instruments={[...new Set(allTrades.map((trade) => trade.instrument))].map((value) => ({ value, label: value }))} setupTypes={[...new Set(allTrades.flatMap((trade) => trade.candidate.optionSelections.filter((item) => item.category === "SETUP_TYPE").map((item) => item.labelSnapshot)))].map((value) => ({ value, label: value }))} entryModels={[...new Set(allTrades.map((trade) => trade.entryModel).filter((value): value is string => Boolean(value)))].map((value) => ({ value, label: value }))} mistakes={[...new Set(allTrades.map((trade) => trade.review?.primaryMistake).filter((value): value is string => Boolean(value && value !== "NONE")))].map((value) => ({ value, label: value }))} />
       {!selectedRange.valid && <p className={styles.rangeError} role="alert">Custom start date must be before the end date.</p>}
 
-      <section className={styles.operationBar} aria-label="Today’s operating state">
+      {filters.tab === "journal" && <section className={styles.operationBar} aria-label="Today’s operating state">
         <div><small>ACTIVE PLAN</small><strong>{plan ? `${planInstrument?.instrument ?? "Daily plan"} · Active` : "No active plan"}</strong></div>
         <div><small>SESSION</small><strong>{plan ? JSON.parse(plan.sessionLabels).join(", ") : "Not set"}</strong></div>
         <div><small>RISK MODE</small><strong>{plan?.riskMode === "REDUCED" ? "Reduced · 1%" : plan ? "Standard · 2%" : "Not set"}</strong></div>
         <div><small>TRADE THESES</small><strong>{tradeTheses} of {plan?.maxTradeTheses ?? 2}</strong></div>
         <div><small>WEEKLY OBJECTIVE</small><strong>{plan?.objective || "Not set"}</strong></div>
         <Link href={plan ? "/plan" : "/plan"}>{plan ? "Open plan" : "Create plan"}</Link>
-      </section>
+      </section>}
 
       {filters.tab === "journal" && <><MetricStrip columns={5}>
         <MetricCell label="Execution accuracy" value={executionAccuracy == null ? "—" : `${executionAccuracy}%`} detail={reviewed.length ? `${valid.length} valid · ${invalid.length} invalid` : "No completed reviews"}><ProgressLine value={executionAccuracy ?? 0} label="Reviewed execution quality" /></MetricCell>
@@ -95,7 +119,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
       </MetricStrip>
 
       <AnalyticsGrid>
-        <AnalyticsPanel label="Evidence Ledger score" value={reviewed.length ? `${Math.round(((executionAccuracy ?? 0) + (selectivity ?? 0) + (reviewCompletion ?? 0)) / 3)}/100` : "—"} detail="Process score"><div className={styles.scoreRows}><div><span>Rule adherence</span><b>{executionAccuracy ?? 0}</b><ProgressLine value={executionAccuracy ?? 0} /></div><div><span>A / A+ selectivity</span><b>{selectivity ?? 0}</b><ProgressLine value={selectivity ?? 0} tone="info" /></div><div><span>Review completion</span><b>{reviewCompletion ?? 0}</b><ProgressLine value={reviewCompletion ?? 0} tone="warning" /></div></div></AnalyticsPanel>
+        <LedgerScorePanel adherence={executionAccuracy ?? 0} selectivity={selectivity ?? 0} completion={reviewCompletion ?? 0} />
         <AnalyticsPanel label="Cumulative Executed R" value={formatR(cumulative.at(-1) ?? null)} detail="This week"><MiniChart values={cumulative} label="Cumulative executed R this week" /></AnalyticsPanel>
         <AnalyticsPanel label="Drawdown" value={formatR(drawdown.at(-1) ?? null)} detail="Current R"><MiniChart values={drawdown} tone="danger" label="Drawdown in R this week" /></AnalyticsPanel>
         <AnalyticsPanel label="Valid-trade R" value={formatR(validCurve.at(-1) ?? null)} detail="Reviewed valid trades"><MiniChart values={validCurve} tone="info" label="Cumulative R from valid trades this week" /></AnalyticsPanel>
@@ -109,7 +133,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
         <aside className={styles.rightRail}><section className={styles.panel}><header><div><small>ATTENTION REQUIRED</small><h2>Review queue</h2></div><StatusBadge tone={reviewQueue.length ? "warning" : "success"}>{reviewQueue.length}</StatusBadge></header>{reviewQueue.length ? <ul className={styles.queue}>{reviewQueue.map((item) => <li key={item.id}><StatusBadge tone={item.tone}>{item.kind}</StatusBadge><div><b>{item.title}</b><p>{item.detail}</p><small>{item.time}</small></div><Link href={item.href}>Open</Link></li>)}</ul> : <EmptyState title="Review queue clear" text="No unresolved reviews or evidence requirements." />}</section><section className={styles.panel}><header><div><small>SYSTEM WATCH</small><h2>Alerts</h2></div></header>{alerts.length ? <ul className={styles.alerts}>{alerts.map(([tone, heading, message, href]) => <li key={heading}><StatusBadge tone={tone}>{tone === "danger" ? "Critical" : tone === "warning" ? "Attention" : "Info"}</StatusBadge><div><b>{heading}</b><p>{message}</p></div><Link href={href}>Open</Link></li>)}</ul> : <EmptyState title="No active alerts" text="The current strategy and daily journal state have no integrity warnings." />}</section></aside>
       </div>
       <p className={styles.demoLabel}>All displayed records are demo data where labelled and do not represent real trading history.</p></>}
-      {filters.tab === "comparison" && <section className={styles.comparison}><h2>Comparison</h2><p>Compare filtered journal data with a second selection in a later analytics phase. Current selection: <b>{weeklyTrades.length} closed trades</b>, {formatR(weeklyTrades.reduce((sum, trade) => sum + (trade.executedR ?? 0), 0))}, {executionAccuracy ?? "—"}% execution accuracy. No statistical significance is claimed.</p></section>}
+      {filters.tab === "comparison" && (weeklyTrades.length === 0 ? <EmptyState title="No trades in selection" text="Adjust the date range or filters to include trades." action={{ href: "/?tab=journal", label: "Go to Journal" }} /> : <PerformanceDashboard data={{ tradeCount: weeklyTrades.length, winCount: winning.length, lossCount: losing.length, totalR, averageR, grossWins, grossLosses, avgWin, avgLoss, winRate: winRateRaw, profitFactor: profitFactorValue, sharpeRatio, sortino, maxDrawdown: maxDD, currentDrawdown, recoveryFactor, consistencyScore, cumulativeCurve: cumulative, tradeDates, executionAccuracy }} />)}
       {filters.tab === "analysis" && <><div className={styles.analysisHeader}><div><p className="eyebrow">Performance intelligence</p><h1>Analysis</h1><p className="muted">Review performance, execution quality, setup behaviour, and recurring mistakes.</p></div></div><AnalysisDashboard trades={weeklyTrades.map((trade) => ({ id: trade.id, createdAt: trade.createdAt, executedR: trade.executedR, instrument: trade.instrument, direction: trade.direction, account: trade.account, entryModel: trade.entryModel, gradeLetter: trade.gradeLetter, session: trade.candidate.sessionLabel, setupType: trade.candidate.optionSelections.find((item) => item.category === "SETUP_TYPE")?.labelSnapshot ?? "Unspecified", closeStatus: trade.closeStatus, strategy: trade.strategyVersion.strategy.name, version: trade.strategyVersion.versionNumber, review: trade.review ? { status: trade.review.status, classification: trade.review.classification, primaryMistake: trade.review.primaryMistake } : null }))} group={filters.group} /></>}
     </div>
   </Shell>;

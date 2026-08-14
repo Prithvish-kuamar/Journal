@@ -4,11 +4,16 @@ import { Gate15Checklist } from "@/components/gate15-checklist";
 import { answerGate, completeDiagnostics, createTrade, saveGrade } from "@/app/actions";
 import { prisma } from "@/lib/prisma";
 import { plannedRewardRisk, tradePermission } from "@/lib/domain";
+import { hasTargetDecision } from "@/lib/target-decision";
 import { gradeText } from "@/lib/grade-copy";
+import { guardPage } from "@/lib/supabase/page-guard";
+import { EvidenceControls } from "@/components/evidence-controls";
+import { TargetDecisionForm } from "@/components/target-decision-form";
 
 export const dynamic = "force-dynamic";
 
 export default async function SetupWorkflow({ params }: { params: Promise<{ id: string }> }) {
+  await guardPage();
   const { id } = await params;
   const setup = await prisma.setupCandidate.findUnique({
     where: { id },
@@ -34,6 +39,7 @@ export default async function SetupWorkflow({ params }: { params: Promise<{ id: 
   const responseByKey = new Map(assessment.responses.map((response) => [response.gateKey, response]));
   const plannedR = plannedRewardRisk(setup.plannedEntry ?? undefined, setup.plannedStop ?? undefined, setup.plannedTarget ?? undefined);
   const gradePermission = setup.grade ? tradePermission(setup.grade.letter) : null;
+  const targetDecided = hasTargetDecision(setup.targets);
   setup.strategyVersion.gradeCategories.forEach((category) => {
     category.scoreOne = gradeText(category.title, 1, category.scoreOne);
     category.scoreTwo = gradeText(category.title, 2, category.scoreTwo);
@@ -56,6 +62,7 @@ export default async function SetupWorkflow({ params }: { params: Promise<{ id: 
     executedTradeTheses: dailyTrades.length,
     consecutiveLosingTheses
   };
+  async function submitTrade(formData: FormData) { "use server"; const result = await createTrade(formData); if (result?.ok === false) return; }
 
   return <Shell>
     <div className="title-row">
@@ -72,7 +79,7 @@ export default async function SetupWorkflow({ params }: { params: Promise<{ id: 
         <p><strong>Thesis:</strong> {setup.thesis || "Not recorded"}</p>
         <p><strong>Entry / stop / target:</strong> {setup.plannedEntry ?? "—"} / {setup.plannedStop ?? "—"} / {setup.plannedTarget ?? "—"}</p>
         <p><strong>Planned R:</strong> {plannedR?.toFixed(2) ?? "Unavailable — add entry, stop and target"}</p>
-        <p><strong>Evidence:</strong> {setup.evidence.length} attachment records. Late uploads must be marked late.</p>
+        <p><strong>Evidence:</strong> {setup.evidence.length} attachment records. Late uploads must be marked late.</p><EvidenceControls associationType="setup" associatedId={setup.id} initial={setup.evidence.map((item) => ({ id: item.id, filename: item.filename, mimeType: item.mimeType, byteSize: item.byteSize, label: item.label }))} />
       </section>
       <section className="card">
         <h2>Gate state</h2>
@@ -113,6 +120,13 @@ export default async function SetupWorkflow({ params }: { params: Promise<{ id: 
       <p className="muted">Realistic 2R is optional. Planned R: {plannedR?.toFixed(2) ?? "Unavailable"}</p>
     </section>
 
+    <section className="card">
+      <h2>Target decision</h2>
+      <p className="muted">Define at least one target reference, or explicitly record No target. This decision is required before recording a trade.</p>
+      {setup.targets.length > 0 && <p className="notice">Current target decision: <strong>{setup.targets.map((target) => target.label).join(", ")}</strong></p>}
+      <TargetDecisionForm candidateId={setup.id} currentLabel={setup.targets[0]?.label || ""} />
+    </section>
+
     {assessment.result === "PASSED" && <section className="card">
       <h2>Setup grading</h2>
       <p>Every category must be 1 or 2. A zero is impossible after gate pass.</p>
@@ -133,7 +147,7 @@ export default async function SetupWorkflow({ params }: { params: Promise<{ id: 
 
     <section className="card">
       <h2>Trade entry</h2>
-      {setup.trade ? <p>Trade created: <strong>{setup.trade.status}</strong>. Grade and gates are locked.</p> : <form action={createTrade}>
+      {setup.trade ? <p>Trade created: <strong>{setup.trade.status}</strong>. Grade and gates are locked.</p> : <form action={submitTrade}>
         <input type="hidden" name="candidateId" value={setup.id}/>
         <div className="grid three">
           <label className="field">Entry price<input name="entryPrice" type="number" step="any" defaultValue={setup.plannedEntry ?? ""}/></label>
@@ -148,7 +162,8 @@ export default async function SetupWorkflow({ params }: { params: Promise<{ id: 
         <h3>Net PnL</h3><div className="grid three"><label className="field">Calculation mode<select name="pnlMethod"><option value="MANUAL">Enter manually</option><option value="CALCULATED">Calculate from instrument metadata</option></select></label><label className="field">Manual Net PnL<input name="manualNetPnl" type="number" step="any"/></label><label className="field">Currency<input name="pnlCurrency" placeholder="USD"/></label><label className="field">Gross PnL<input name="grossPnl" type="number" step="any"/></label><label className="field">Fees<input name="fees" type="number" step="any"/></label><label className="field">Commission<input name="commission" type="number" step="any"/></label><label className="field">Swap / funding<input name="swapFunding" type="number" step="any"/></label></div><label className="field">Manual PnL explanation / override reason<textarea name="pnlExplanation"/></label>
         <label className="field">Technical invalidation<textarea name="technicalInvalidation"/></label>
         {(assessment.result === "REJECTED" || gradePermission !== "PERMITTED") && <label className="field">Required restricted-record override reason<textarea required name="overrideReason" placeholder="Acknowledgement, reason and emotional/deliberate context"/></label>}
-        <button>{assessment.result === "REJECTED" || gradePermission !== "PERMITTED" ? "Record restricted historical trade" : "Create trade and lock grade"}</button>
+        {!targetDecided && <p className="notice" role="alert">Add a target or select No target before recording this trade.</p>}
+        <button disabled={!targetDecided}>{assessment.result === "REJECTED" || gradePermission !== "PERMITTED" ? "Record restricted historical trade" : "Create trade and lock grade"}</button>
       </form>}
       <p className="muted">Risk amount/position-size calculation is unavailable until instrument metadata and the owner-selected account-risk basis are complete; values are never guessed.</p>
     </section>

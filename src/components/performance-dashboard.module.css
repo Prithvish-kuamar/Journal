@@ -1,0 +1,116 @@
+.perfDash{display:grid;gap:14px;padding-top:4px}
+
+/* Cards */
+.card{padding:16px 18px;border:1px solid var(--border-subtle);background:var(--surface-primary);display:flex;flex-direction:column;gap:10px}
+.cardHead{display:flex;justify-content:space-between;align-items:flex-start}
+.cardHead small{color:var(--text-muted);font:700 9px var(--mono);letter-spacing:.1em;text-transform:uppercase}
+.cardHead b{font:700 22px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--text-primary)}
+.cardWide{grid-column:span 1}
+.dimTag{color:var(--text-muted);font:9px var(--mono)}
+.outOf{font-size:13px;color:var(--text-muted);font-weight:400}
+
+/* Rows */
+.row1{display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px}
+.row2{display:grid;grid-template-columns:1fr 1.6fr 1fr;gap:14px}
+.row3{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+
+/* Colors */
+.success{color:var(--success)}.danger{color:var(--danger)}.muted{color:var(--text-muted)}
+
+/* Area chart */
+.areaChartWrap{margin:0;flex:1;min-height:0;max-height:130px}
+.areaChart{display:block;width:100%;height:100%;overflow:visible}
+.zeroLine{stroke:#2a2e32;stroke-width:.7}
+.areaFill{fill:rgba(52,199,89,.08)}
+.areaFillRed{fill:rgba(220,53,69,.08)}
+.areaLine{fill:none;stroke:var(--success);stroke-width:1.5;vector-effect:non-scaling-stroke}
+.areaLineRed{fill:none;stroke:var(--danger);stroke-width:1.5;vector-effect:non-scaling-stroke}
+.axisLabel{fill:var(--text-muted);font:8px var(--mono)}
+.chartEmpty{padding:24px 0;color:var(--text-muted);font:10px var(--mono);text-align:center}
+
+/* Win rate gauge */
+.gaugeWrap{margin:0 auto;width:100%;max-width:220px}
+.gaugeSvg{display:block;width:100%;aspect-ratio:200/120}
+.gaugeGreen{color:var(--success)}.gaugeOrange{color:#f0a500}.gaugeRed{color:var(--danger)}
+.gaugeValue{fill:var(--text-primary);font:700 22px var(--mono);font-variant-numeric:tabular-nums}
+.gaugeLabel{fill:var(--text-muted);font:8px var(--mono)}
+
+/* Rating row */
+.ratingRow{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-top:auto}
+.ratingCell{padding:6px 7px;background:#141618;text-align:center;border:1px solid transparent}
+.ratingCell span{display:block;color:var(--text-muted);font:700 8px var(--mono);text-transform:uppercase}
+.ratingCell small{display:block;color:var(--text-secondary);font:9px var(--mono);margin-top:2px}
+.ratingActive{border-color:var(--border-strong);background:#1c2026}
+.ratingActive span{color:var(--text-primary)}
+
+/* Sub stats grid */
+.subStats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.subStats div{display:grid;gap:2px}
+.subStats small{color:var(--text-muted);font:700 8px var(--mono);letter-spacing:.06em;text-transform:uppercase}
+.subStats span{color:var(--text-primary);font:11px var(--mono);font-variant-numeric:tabular-nums}
+
+/* Rating bar (profit factor etc.) */
+.ratingBar{display:flex;flex-direction:column;gap:5px;margin-top:4px}
+.ratingBarTrack{position:relative;height:6px;border-radius:3px;overflow:visible}
+.ratingBarGradient{position:absolute;inset:0;border-radius:3px;background:linear-gradient(to right,#6d3a3a,#71562b,#315b48,#1d4a6b)}
+.ratingBarPin{position:absolute;top:-4px;width:3px;height:14px;background:#fff;border-radius:2px;transform:translateX(-50%);box-shadow:0 0 4px rgba(0,0,0,.6)}
+.ratingBarLabels{display:grid;grid-template-columns:repeat(4,1fr);color:var(--text-muted);font:8px var(--mono)}
+.ratingBarLabels span:last-child{text-align:right}
+.ratingBarValue{display:flex;gap:8px;align-items:baseline}
+.ratingBarValue b{font:700 16px/1 var(--mono);font-variant-numeric:tabular-nums}
+.ratingNote{margin:0;color:var(--text-muted);font:9px var(--mono);line-height:1.4}
+.ratingValueRow{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border-subtle);color:var(--text-secondary);font:10px var(--mono)}
+.ratingValueRow b{font:700 14px var(--mono)}
+.cardSection{margin:4px 0 0;color:var(--text-muted);font:700 8px var(--mono);letter-spacing:.08em;text-transform:uppercase}
+
+/* Pentagon radar */
+.pentagonWrap{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;gap:0 14px;align-items:center}
+.pentagonScore{grid-column:1/-1;display:flex;align-items:baseline;gap:5px;margin-bottom:8px}
+.pentagonScore small{color:var(--text-muted);font:700 9px var(--mono);letter-spacing:.1em;text-transform:uppercase;flex:1}
+.pentagonScore b{font:700 24px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--text-primary)}
+.pentagonScore span{color:var(--text-muted);font:10px var(--mono)}
+.pentagonSvg{width:160px;height:160px;flex-shrink:0}
+.pentOuter{stroke:#252a2e;stroke-width:.8;fill:none}
+.pentRing{stroke:#1e2326;stroke-width:.6;fill:none;stroke-dasharray:2 2}
+.pentAxis{stroke:#1e2326;stroke-width:.6}
+.pentData{stroke:rgba(255,255,255,.6);stroke-width:1.2;fill:rgba(255,255,255,.06)}
+.pentDot{fill:#fff;opacity:.7}
+.pentLabel{fill:var(--text-muted);font:700 7px var(--mono);letter-spacing:.04em;text-transform:uppercase}
+.pentMetrics{display:flex;flex-direction:column;gap:7px}
+.perfScoreBar{grid-column:1/-1;margin-top:12px}
+.perfScoreTicks{display:flex;justify-content:space-between;align-items:baseline;color:var(--text-muted);font:8px var(--mono);margin-top:4px}
+.perfScoreTicks b{color:var(--text-primary);font:700 10px var(--mono)}
+.pentRow{display:grid;grid-template-columns:58px 1fr 24px;gap:5px;align-items:center}
+.pentRow span{color:var(--text-muted);font:700 7.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.pentRow b{color:var(--text-primary);font:700 10px/1 var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+.pentBarTrack{height:3px;background:#1e2326;border-radius:1px;overflow:hidden}
+.pentBarFill{height:100%;background:rgba(255,255,255,.4);border-radius:1px}
+
+/* Recovery factor */
+.statPair{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.statPair>div{display:grid;gap:3px}
+.statPair small{color:var(--text-muted);font:700 8px var(--mono);letter-spacing:.06em;text-transform:uppercase}
+.statPair b{font:700 13px var(--mono);font-variant-numeric:tabular-nums}
+.statPair span{color:var(--text-muted);font:9px var(--mono)}
+
+/* Drawdown */
+.ddGrid{display:flex;justify-content:space-between;gap:8px}
+.ddGrid>div{display:grid;gap:3px}
+.ddGrid small{color:var(--text-muted);font:700 8px var(--mono);letter-spacing:.06em;text-transform:uppercase}
+.ddGrid b{font:700 13px var(--mono);font-variant-numeric:tabular-nums}
+.ddGrid span{color:var(--text-muted);font:9px var(--mono)}
+.ddBar{height:3px;background:#1e2326;border-radius:1px;overflow:hidden}
+.ddFill{height:100%;background:var(--danger);border-radius:1px}
+
+/* Consistency */
+.consistBar{position:relative;height:6px;border-radius:3px;overflow:visible;margin-top:4px}
+.consistGradient{position:absolute;inset:0;border-radius:3px;background:linear-gradient(to right,#6d3a3a,#71562b,#315b48)}
+.consistPin{position:absolute;top:-4px;width:3px;height:14px;background:#fff;border-radius:2px;transform:translateX(-50%);box-shadow:0 0 4px rgba(0,0,0,.6)}
+.consistLabels{display:flex;justify-content:space-between;color:var(--text-muted);font:8px var(--mono)}
+.streakGrid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px;border-top:1px solid var(--border-subtle);padding-top:8px}
+.streakGrid small{color:var(--text-muted);font:700 8px var(--mono);letter-spacing:.06em;text-transform:uppercase}
+.streakGrid span{color:var(--text-secondary);font:10px var(--mono)}
+
+@media(max-width:1200px){.row1{grid-template-columns:1.5fr 1fr}}
+@media(max-width:1100px){.row1,.row2{grid-template-columns:1fr 1fr}.row3{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){.row1,.row2,.row3{grid-template-columns:1fr}}

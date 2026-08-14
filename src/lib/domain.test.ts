@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canCreateAddOn, canDeleteStrategyVersion, canGrade, canModifyGrade, classificationAfterOutcome, dailyThesisDecision, gateOutcome, gradeForScores, isLateEvidence, plannedRewardRisk, rMeasurements, tradePermission } from "./domain";
+import { canCreateAddOn, canDeleteStrategyVersion, canGrade, canModifyGrade, dailyThesisDecision, gateOutcome, gradeForScores, isLateEvidence, plannedRewardRisk, rMeasurements, tradePermission } from "./domain";
 
 describe("Phase 1 business rules", () => {
   const gates = ["G01", "G02"];
@@ -23,7 +23,6 @@ describe("Phase 1 business rules", () => {
     expect(dailyThesisDecision(2, true)).toEqual({ allowed: true, countsTowardDailyLimit: false });
   });
   it("marks screenshots late from capture time rather than upload optimism", () => expect(isLateEvidence(new Date("2026-08-02T10:01:00Z"), new Date("2026-08-02T10:00:00Z"))).toBe(true));
-  it("preserves invalid classification even when an outcome wins", () => expect(classificationAfterOutcome("Invalid win")).toBe("Invalid win"));
   it("keeps the three R measurements separate", () => expect(rMeasurements({ netResult: 200, executedRisk: 100, plannedCapitalRisk: 200, maximumRisk: 400 })).toEqual({ executedR: 2, plannedCapitalR: 1, maximumRiskR: 0.5 }));
   it("does not fabricate planned R", () => expect(plannedRewardRisk(100, 100, 120)).toBeNull());
   it("does not allow referenced historical versions to be deleted", () => expect(canDeleteStrategyVersion(1)).toBe(false));

@@ -1,14 +1,6 @@
 export type GateAnswer = { gateKey: string; answer: boolean };
 export type GateState = { result: "IN_PROGRESS" | "PASSED" | "REJECTED"; diagnosticCompletion: "PARTIAL" | "COMPLETE"; firstFailedGateKey?: string };
 
-export function applyGateAnswer(state: GateState, response: GateAnswer, activeGateKeys: string[]): GateState {
-  const rejected = state.result === "REJECTED" || !response.answer;
-  const firstFailedGateKey = state.firstFailedGateKey ?? (!response.answer ? response.gateKey : undefined);
-  const answered = new Set([...(state.result === "IN_PROGRESS" ? [] : []), response.gateKey]);
-  const complete = activeGateKeys.every((key) => answered.has(key));
-  return { result: rejected ? "REJECTED" : complete ? "PASSED" : "IN_PROGRESS", diagnosticCompletion: complete ? "COMPLETE" : state.diagnosticCompletion, firstFailedGateKey };
-}
-
 export function gateOutcome(responses: GateAnswer[], activeGateKeys: string[]): GateState {
   const firstNo = responses.find((response) => !response.answer);
   const complete = activeGateKeys.every((key) => responses.some((response) => response.gateKey === key));
@@ -58,5 +50,4 @@ export function dailyThesisDecision(executedTheses: number, isAddOn: boolean) {
   return { allowed: executedTheses < 2, countsTowardDailyLimit: true, restrictedHistoricalOnly: executedTheses >= 2 };
 }
 export function isLateEvidence(capturedAt: Date | undefined, intendedEventAt: Date) { return !capturedAt || capturedAt.getTime() > intendedEventAt.getTime(); }
-export function classificationAfterOutcome(originalClassification: string) { return originalClassification; }
 export function canDeleteStrategyVersion(historicalReferenceCount: number) { return historicalReferenceCount === 0; }

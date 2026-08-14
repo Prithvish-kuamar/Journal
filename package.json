@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/validate-production-env.mjs --required",
     "build": "next build",
+    "prestart": "node scripts/validate-production-env.mjs --required",
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
@@ -15,13 +17,19 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:baseline:status": "prisma migrate status",
     "db:backup": "node scripts/create-db-backup.mjs",
+    "db:postgres:status": "prisma migrate status",
+    "db:sqlite-to-postgres": "node scripts/migrate-sqlite-to-postgres.mjs",
+    "storage:verify": "node --env-file=.env scripts/verify-storage-config.mjs",
     "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.12.0",
+    "@supabase/ssr": "^0.12.4",
+    "@supabase/supabase-js": "^2.111.0",
     "next": "^15.4.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "server-only": "^0.0.1",
     "zod": "^4.0.0"
   },
   "devDependencies": {

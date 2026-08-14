@@ -35,6 +35,50 @@ export function AnalyticsGrid({ children }: { children: ReactNode }) {
   return <div className={styles.analyticsGrid}>{children}</div>;
 }
 
+export function LedgerScorePanel({ adherence, selectivity, completion }: { adherence: number; selectivity: number; completion: number }) {
+  const score = Math.round((adherence + selectivity + completion) / 3);
+  const hasData = adherence > 0 || selectivity > 0 || completion > 0;
+  const cx = 40; const cy = 46; const r = 28; const sin60 = 0.866;
+  const ov = [[cx, cy - r], [cx + r * sin60, cy + r * 0.5], [cx - r * sin60, cy + r * 0.5]];
+  const sc = (v: number) => Math.max(0.04, v / 100);
+  const dv = ov.map(([x, y], i) => { const vals = [adherence, selectivity, completion]; return [cx + (x - cx) * sc(vals[i]), cy + (y - cy) * sc(vals[i])]; });
+  const pts = (arr: number[][]) => arr.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const metrics = [{ label: "Adherence", value: adherence }, { label: "Selectivity", value: selectivity }, { label: "Completion", value: completion }];
+  return (
+    <section className={styles.ledgerScore}>
+      <div className={styles.ledgerScoreHead}>
+        <small>EVIDENCE LEDGER SCORE</small>
+        <div className={styles.scoreBadge}>
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true"><path d="M1.5 8.5A5 5 0 1 1 9.5 8.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><path d="M5.5 8L7 4.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/></svg>
+          <b>{hasData ? score : "—"}</b><span>/100</span>
+        </div>
+      </div>
+      <div className={styles.ledgerBody}>
+        <figure className={styles.triangleWrap} aria-hidden="true">
+          <svg viewBox="0 0 80 86" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <polygon points={pts(ov)} className={styles.triangleOuter}/>
+            <polygon points={pts(dv)} className={styles.triangleData}/>
+            {ov.map(([x, y], i) => <line key={i} x1={cx} y1={cy} x2={x} y2={y} className={styles.triangleAxis}/>)}
+            <text x={cx} y={cy - r - 5} textAnchor="middle" className={styles.triLabel}>Adh.</text>
+            <text x={cx + r * sin60} y={cy + r * 0.5 + 11} textAnchor="middle" className={styles.triLabel}>Sel.</text>
+            <text x={cx - r * sin60} y={cy + r * 0.5 + 11} textAnchor="middle" className={styles.triLabel}>Rev.</text>
+          </svg>
+        </figure>
+        <div className={styles.ledgerMetrics}>
+          {metrics.map(({ label, value }) => (
+            <div key={label} className={styles.ledgerRow}>
+              <span>{label}</span>
+              <div className={styles.ledgerBarTrack}><div className={styles.ledgerBarFill} style={{ width: `${value}%` }}/></div>
+              <b>{value}</b>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className={styles.ledgerFoot}><div className={styles.ledgerFootFill} style={{ width: `${hasData ? score : 0}%` }}/></div>
+    </section>
+  );
+}
+
 export function MiniChart({ values, tone = "success", label }: { values: number[]; tone?: "success" | "danger" | "info"; label: string }) {
   const safe = values.length ? values : [0, 0];
   const min = Math.min(...safe); const max = Math.max(...safe); const range = max - min || 1;

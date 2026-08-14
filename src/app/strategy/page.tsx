@@ -4,6 +4,7 @@ import { createDraftVersion, publishStrategyVersion } from "@/app/actions";
 import { FilterToken, MetricCell, MetricStrip, PageToolbar, ProgressLine, StatusBadge } from "@/components/ledger-ui";
 import { prisma } from "@/lib/prisma";
 import styles from "./strategy.module.css";
+import { guardPage } from "@/lib/supabase/page-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -11,12 +12,13 @@ const asList = (value: unknown) => Array.isArray(value) ? value.filter((item): i
 const r = (value: number) => `${value >= 0 ? "+" : ""}${value.toFixed(2)}R`;
 
 export default async function StrategyPage() {
+  await guardPage();
   const versions = await prisma.strategyVersion.findMany({
     include: { strategy: true, rules: { orderBy: { displayOrder: "asc" } }, gates: { orderBy: { displayOrder: "asc" } }, gradeCategories: { orderBy: { displayOrder: "asc" } }, entryModels: { orderBy: { code: "asc" } }, trades: { include: { review: true } } },
     orderBy: { versionNumber: "desc" }
   });
   const current = versions[0];
-  if (!current) return <Shell><div className={styles.empty}><h1>Strategy Library</h1><p>No strategy exists yet. Run the documented demo seed command to load clearly labelled local data.</p></div></Shell>;
+  if (!current) return <Shell><div className={styles.empty}><h1>Strategy Library</h1><p>No strategy exists yet.</p><p className="muted">Create your first strategy to begin journaling.</p><Link className="new" href="/strategy/new">+ Create Strategy</Link></div></Shell>;
   const currentConfig = JSON.parse(current.configuration) as Record<string, unknown>;
   const allTrades = versions.flatMap((version) => version.trades);
   const totalR = allTrades.reduce((sum, trade) => sum + (trade.executedR ?? 0), 0);

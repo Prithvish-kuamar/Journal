@@ -18,3 +18,4 @@ graphify-out/
 coverage/
 Windows-MCP/
 *.log
+sqlite-to-postgres-report-*.json
