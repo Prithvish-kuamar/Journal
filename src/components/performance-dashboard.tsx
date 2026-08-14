@@ -31,7 +31,7 @@ const fmtRatio = (v: number | null) => v == null ? "—" : v.toFixed(2);
 const clamp = (v: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, v));
 
 function RatingRow({ thresholds, value }: { thresholds: { label: string; min: string; max?: string }[]; value: number | null }) {
-  const active = value == null ? -1 : thresholds.findLastIndex((t, i) => {
+  const active = value == null ? -1 : thresholds.findLastIndex((t: { label: string; min: string; max?: string }, i: number) => {
     const min = parseFloat(t.min);
     return value >= min || i === 0;
   });

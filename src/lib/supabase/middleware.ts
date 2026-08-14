@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 import { safeReturnPath } from "@/lib/supabase/auth-utils";
 
-const publicPaths = ["/login", "/health"];
+const publicPaths = ["/login"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -19,7 +19,10 @@ export async function updateSession(request: NextRequest) {
       }
     }
   });
-  const { data: { user } } = await supabase.auth.getUser();
+  // getSession reads the JWT from the cookie without a network round-trip.
+  // requireOwner() calls getUser() (network-verified) on every actual page/API handler.
+  const { data: { session } } = await supabase.auth.getSession();
+  const user = session?.user ?? null;
   const pathname = request.nextUrl.pathname;
   const isPublic = publicPaths.includes(pathname) || pathname.startsWith("/_next/") || pathname.startsWith("/favicon");
   if (isPublic) return response;

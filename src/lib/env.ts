@@ -5,7 +5,6 @@ const schema = z.object({
   DIRECT_URL: z.string().min(1).refine((value) => value.startsWith("postgresql://") || value.startsWith("postgres://"), "DIRECT_URL must be a PostgreSQL connection URL."),
   NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   SUPABASE_SECRET_KEY: z.string().min(1),
   SUPABASE_STORAGE_BUCKET: z.string().min(1).default("evidence-private"),
   OWNER_EMAIL: z.string().email(),

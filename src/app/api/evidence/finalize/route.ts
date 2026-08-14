@@ -27,8 +27,8 @@ export async function POST(request: NextRequest) {
   const downloaded = await admin.storage.from(bucket).download(parsed.data.path);
   if (downloaded.error || !downloaded.data) return NextResponse.json({ error: "Uploaded evidence could not be verified." }, { status: 400 });
   const bytes = new Uint8Array(await downloaded.data.arrayBuffer());
-  const actualType = downloaded.data.type || parsed.data.mimeType;
-  if (bytes.byteLength > MAX_EVIDENCE_BYTES || actualType !== parsed.data.mimeType || !signatureMatches(bytes, parsed.data.mimeType)) { await admin.storage.from(bucket).remove([parsed.data.path]); return NextResponse.json({ error: "The uploaded file did not pass image verification." }, { status: 415 }); }
+  const reportedType = downloaded.data.type;
+  if (bytes.byteLength > MAX_EVIDENCE_BYTES || (reportedType && reportedType !== parsed.data.mimeType) || !signatureMatches(bytes, parsed.data.mimeType)) { await admin.storage.from(bucket).remove([parsed.data.path]); return NextResponse.json({ error: "The uploaded file did not pass image verification." }, { status: 415 }); }
   try {
     const evidence = await prisma.evidence.create({ data: { id: parsed.data.evidenceId, ...parents, filename: sanitizeFilename(parsed.data.originalFilename), originalFilename: sanitizeFilename(parsed.data.originalFilename), mimeType: parsed.data.mimeType, byteSize: bytes.byteLength, storageBucket: bucket, storagePath: parsed.data.path, label: parsed.data.label ?? null, capturedAt: parsed.data.capturedAt ? new Date(parsed.data.capturedAt) : null } });
     await prisma.auditEvent.create({ data: { entityType: "Evidence", entityId: evidence.id, action: "EVIDENCE_UPLOADED" } });

@@ -83,7 +83,7 @@ export function MiniChart({ values, tone = "success", label }: { values: number[
   const safe = values.length ? values : [0, 0];
   const min = Math.min(...safe); const max = Math.max(...safe); const range = max - min || 1;
   const points = safe.map((value, index) => `${(index / Math.max(safe.length - 1, 1)) * 100},${42 - ((value - min) / range) * 34}`).join(" ");
-  return <figure className={styles.chart} aria-label={label}><svg viewBox="0 0 100 46" preserveAspectRatio="none" role="img"><title>{label}</title><path d="M0 42H100" className={styles.gridLine}/><path d="M0 24H100" className={styles.gridLine}/><polyline points={points} className={styles[tone]} /></svg><figcaption>{safe.length ? `${safe.length} recorded trade${safe.length === 1 ? "" : "s"}` : "No recorded trades"}</figcaption></figure>;
+  return <figure className={styles.chart} aria-label={label}><svg viewBox="0 0 100 46" preserveAspectRatio="none" role="img"><title>{label}</title><path d="M0 42H100" className={styles.gridLine}/><path d="M0 24H100" className={styles.gridLine}/><polyline points={points} className={styles[tone]} /></svg><figcaption>{values.length ? `${values.length} recorded trade${values.length === 1 ? "" : "s"}` : "No recorded trades"}</figcaption></figure>;
 }
 
 type CalendarTrade = { id: string; createdAt: Date; executedR: number | null; review?: { status: string; classification: string | null } | null; candidate: { disposition: string } };

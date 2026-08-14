@@ -1,7 +1,7 @@
 .perfDash{display:grid;gap:14px;padding-top:4px}
 
 /* Cards */
-.card{padding:16px 18px;border:1px solid var(--border-subtle);background:var(--surface-primary);display:flex;flex-direction:column;gap:10px}
+.card{padding:16px 18px;border:1px solid var(--border-subtle);background:var(--surface-primary);display:flex;flex-direction:column;gap:10px;transition:border-color 150ms ease}
 .cardHead{display:flex;justify-content:space-between;align-items:flex-start}
 .cardHead small{color:var(--text-muted);font:700 9px var(--mono);letter-spacing:.1em;text-transform:uppercase}
 .cardHead b{font:700 22px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--text-primary)}
@@ -37,7 +37,7 @@
 
 /* Rating row */
 .ratingRow{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-top:auto}
-.ratingCell{padding:6px 7px;background:#141618;text-align:center;border:1px solid transparent}
+.ratingCell{padding:6px 7px;background:#141618;text-align:center;border:1px solid transparent;transition:background 130ms ease,border-color 130ms ease}
 .ratingCell span{display:block;color:var(--text-muted);font:700 8px var(--mono);text-transform:uppercase}
 .ratingCell small{display:block;color:var(--text-secondary);font:9px var(--mono);margin-top:2px}
 .ratingActive{border-color:var(--border-strong);background:#1c2026}

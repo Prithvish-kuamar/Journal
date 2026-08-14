@@ -4,6 +4,7 @@ import { AnalyticsGrid, AnalyticsPanel, EmptyState, JournalCalendar, LedgerScore
 import { PerformanceDashboard } from "@/components/performance-dashboard";
 import { DashboardControls } from "@/components/dashboard-controls";
 import { AnalysisDashboard } from "@/components/analysis-dashboard";
+import { unstable_cache } from "next/cache";
 import { dashboardFilters, dateRange } from "@/lib/dashboard-filters";
 import { prisma } from "@/lib/prisma";
 import { guardPage } from "@/lib/supabase/page-guard";
@@ -11,7 +12,41 @@ import styles from "./home.module.css";
 
 export const dynamic = "force-dynamic";
 
+// Strategies and versions rarely change — cache for 2 minutes.
+const cachedStrategy = unstable_cache(
+  () => prisma.strategyVersion.findFirst({ where: { status: "PUBLISHED" }, orderBy: { versionNumber: "desc" } }),
+  ["dash-strategy"], { revalidate: 120 }
+);
+const cachedDrafts = unstable_cache(
+  () => prisma.strategyVersion.count({ where: { status: "DRAFT" } }),
+  ["dash-drafts"], { revalidate: 120 }
+);
+const cachedVersions = unstable_cache(
+  () => prisma.strategyVersion.findMany({ include: { strategy: true }, orderBy: { versionNumber: "desc" } }),
+  ["dash-versions"], { revalidate: 120 }
+);
+// Trades: 1-year rolling window, cached 30 s so rapid refreshes don't hammer the DB.
+// unstable_cache serialises to JSON, turning Dates into ISO strings. Re-hydrate them on the way out.
+const _cachedTradesRaw = unstable_cache(
+  () => {
+    const since = new Date();
+    since.setFullYear(since.getFullYear() - 1);
+    return prisma.trade.findMany({ where: { createdAt: { gte: since } }, orderBy: { createdAt: "asc" }, include: { candidate: { include: { optionSelections: true } }, review: true, strategyVersion: { include: { strategy: true } } } });
+  },
+  ["dash-trades-v2"], { revalidate: 30 }
+);
+const cachedTrades = async () => {
+  const rows = await _cachedTradesRaw();
+  return rows.map(t => ({
+    ...t,
+    createdAt: new Date(t.createdAt),
+    entryTimestamp: new Date(t.entryTimestamp),
+    candidate: { ...t.candidate, createdAt: new Date(t.candidate.createdAt), updatedAt: new Date(t.candidate.updatedAt) },
+  }));
+};
+
 const title = (value: string) => value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+const safeJson = <T,>(value: string | null | undefined, fallback: T): T => { try { return value ? JSON.parse(value) as T : fallback; } catch { return fallback; } };
 const formatR = (value: number | null | undefined) => value == null ? "—" : `${value >= 0 ? "+" : ""}${value.toFixed(2)}R`;
 const stamp = (value: Date) => new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(value);
 
@@ -20,13 +55,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   const now = new Date();
   const filters = dashboardFilters(await searchParams, now); const selectedRange = dateRange(filters, now);
   const [strategy, plans, candidates, allTrades, audits, drafts, versions] = await Promise.all([
-    prisma.strategyVersion.findFirst({ where: { status: "PUBLISHED" }, orderBy: { versionNumber: "desc" } }),
+    cachedStrategy(),
     prisma.dailyPlan.findMany({ where: { status: "ACTIVE" }, orderBy: { updatedAt: "desc" }, include: { instruments: true } }),
     prisma.setupCandidate.findMany({ orderBy: { updatedAt: "desc" }, take: 20, include: { gateAssessment: true, grade: true, trade: true, evidence: true } }),
-    prisma.trade.findMany({ where: { status: "CLOSED" }, orderBy: { createdAt: "asc" }, include: { candidate: { include: { optionSelections: true } }, review: true, strategyVersion: { include: { strategy: true } } } }),
+    cachedTrades(),
     prisma.auditEvent.findMany({ orderBy: { timestamp: "desc" }, take: 7 }),
-    prisma.strategyVersion.count({ where: { status: "DRAFT" } }),
-    prisma.strategyVersion.findMany({ include: { strategy: true }, orderBy: { versionNumber: "desc" } })
+    cachedDrafts(),
+    cachedVersions(),
   ]);
   const plan = plans.find((item) => (!filters.account || item.account === filters.account) && (!filters.version || item.strategyVersionId === filters.version)) ?? plans[0];
   const filterTrade = (trade: typeof allTrades[number]) => {
@@ -57,12 +92,16 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   const reviewCompletion = weeklyTrades.length ? Math.round((reviewed.length / weeklyTrades.length) * 100) : null;
   const qualificationDurations = weeklyTrades.map((trade) => trade.entryTimestamp.getTime() - trade.candidate.createdAt.getTime()).filter((value) => value >= 0);
   const averageQualificationMinutes = qualificationDurations.length ? Math.round(qualificationDurations.reduce((sum, value) => sum + value, 0) / qualificationDurations.length / 60000) : null;
-  const cumulative = weeklyTrades.reduce<number[]>((points, trade) => [...points, (points.at(-1) ?? 0) + (trade.executedR ?? 0)], []);
-  const drawdown = cumulative.reduce<number[]>((points, point) => [...points, Math.min(0, point - Math.max(...cumulative.slice(0, points.length + 1)))], []);
-  const validCurve = weeklyTrades.reduce<number[]>((points, trade) => [...points, (points.at(-1) ?? 0) + (trade.review?.classification?.startsWith("Valid") ? (trade.executedR ?? 0) : 0)], []);
+  const cumulative: number[] = [];
+  for (const trade of weeklyTrades) cumulative.push((cumulative.at(-1) ?? 0) + (trade.executedR ?? 0));
+  const drawdown: number[] = [];
+  let runningPeak = 0;
+  for (const point of cumulative) { runningPeak = Math.max(runningPeak, point); drawdown.push(Math.min(0, point - runningPeak)); }
+  const validCurve: number[] = [];
+  for (const trade of weeklyTrades) validCurve.push((validCurve.at(-1) ?? 0) + (trade.review?.classification?.startsWith("Valid") ? (trade.executedR ?? 0) : 0));
   const incompleteDiagnostics = candidates.filter((candidate) => candidate.gateAssessment?.result === "REJECTED" && candidate.gateAssessment.diagnosticCompletion === "PARTIAL");
   const missingEvidence = candidates.filter((candidate) => candidate.evidence.length === 0).slice(0, 2);
-  const config = strategy ? JSON.parse(strategy.configuration) as { riskBasis?: string | null } : null;
+  const config = strategy ? safeJson<{ riskBasis?: string | null }>(strategy.configuration, {}) : null;
 
   // Performance dashboard metrics
   const grossWins = winning.reduce((s, v) => s + v, 0);
@@ -103,7 +142,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
 
       {filters.tab === "journal" && <section className={styles.operationBar} aria-label="Today’s operating state">
         <div><small>ACTIVE PLAN</small><strong>{plan ? `${planInstrument?.instrument ?? "Daily plan"} · Active` : "No active plan"}</strong></div>
-        <div><small>SESSION</small><strong>{plan ? JSON.parse(plan.sessionLabels).join(", ") : "Not set"}</strong></div>
+        <div><small>SESSION</small><strong>{plan ? safeJson<string[]>(plan.sessionLabels, []).join(", ") : "Not set"}</strong></div>
         <div><small>RISK MODE</small><strong>{plan?.riskMode === "REDUCED" ? "Reduced · 1%" : plan ? "Standard · 2%" : "Not set"}</strong></div>
         <div><small>TRADE THESES</small><strong>{tradeTheses} of {plan?.maxTradeTheses ?? 2}</strong></div>
         <div><small>WEEKLY OBJECTIVE</small><strong>{plan?.objective || "Not set"}</strong></div>
@@ -128,7 +167,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
       <JournalCalendar trades={monthTrades} month={selectedMonth} />
 
       <div className={styles.lowerGrid}>
-        <section className={styles.panel}><header><div><small>PREPARATION</small><h2>Active plan</h2></div>{plan && <StatusBadge tone="success">Active</StatusBadge>}</header>{plan ? <><div className={styles.planDetails}><div><small>Instrument</small><b>{planInstrument?.instrument ?? "Not specified"}</b></div><div><small>Bias</small><b>{planInstrument ? title(planInstrument.bias) : "Not specified"}</b></div><div><small>Archetype</small><b>{planInstrument?.archetype ?? "Not specified"}</b></div><div><small>Entry models</small><b>{planInstrument ? JSON.parse(planInstrument.permittedModels).join(", ") : "Not specified"}</b></div></div><p className={styles.narrative}>{planInstrument?.macroNarrative || "No macro narrative recorded."}</p><footer><Link href="/plan">Open full plan</Link><Link href="/journal/new">Create setup from plan</Link></footer></> : <EmptyState title="No active plan" text="Prepare direction, scenarios, and risk conditions before qualifying a setup." action={{ href: "/plan", label: "Create Daily Plan" }} />}</section>
+        <section className={styles.panel}><header><div><small>PREPARATION</small><h2>Active plan</h2></div>{plan && <StatusBadge tone="success">Active</StatusBadge>}</header>{plan ? <><div className={styles.planDetails}><div><small>Instrument</small><b>{planInstrument?.instrument ?? "Not specified"}</b></div><div><small>Bias</small><b>{planInstrument ? title(planInstrument.bias) : "Not specified"}</b></div><div><small>Archetype</small><b>{planInstrument?.archetype ?? "Not specified"}</b></div><div><small>Entry models</small><b>{planInstrument ? safeJson<string[]>(planInstrument.permittedModels, []).join(", ") : "Not specified"}</b></div></div><p className={styles.narrative}>{planInstrument?.macroNarrative || "No macro narrative recorded."}</p><footer><Link href="/plan">Open full plan</Link><Link href="/journal/new">Create setup from plan</Link></footer></> : <EmptyState title="No active plan" text="Prepare direction, scenarios, and risk conditions before qualifying a setup." action={{ href: "/plan", label: "Create Daily Plan" }} />}</section>
         <section className={styles.panel}><header><div><small>LEDGER</small><h2>Recent activity</h2></div><Link href="/journal">View journal</Link></header>{audits.length ? <div className={styles.activityTable} role="table" aria-label="Recent journal activity"><div role="row" className={styles.activityHead}><span>Record</span><span>Event</span><span>Status</span><span>Time</span></div>{audits.map((event) => <Link role="row" href={event.entityType === "StrategyVersion" ? "/strategy" : event.entityType === "TradeReview" ? "/review" : "/journal"} key={event.id}><span>{title(event.entityType)}</span><b>{title(event.action)}</b><StatusBadge tone={event.action.includes("REJECT") ? "danger" : event.action.includes("RESTRICT") ? "warning" : "info"}>{event.action.includes("REJECT") ? "Rejected" : event.action.includes("RESTRICT") ? "Restricted" : "Recorded"}</StatusBadge><time>{stamp(event.timestamp)}</time></Link>)}</div> : <EmptyState title="No journal activity" text="Start a daily plan, then capture a setup before outcome is known." />}</section>
         <aside className={styles.rightRail}><section className={styles.panel}><header><div><small>ATTENTION REQUIRED</small><h2>Review queue</h2></div><StatusBadge tone={reviewQueue.length ? "warning" : "success"}>{reviewQueue.length}</StatusBadge></header>{reviewQueue.length ? <ul className={styles.queue}>{reviewQueue.map((item) => <li key={item.id}><StatusBadge tone={item.tone}>{item.kind}</StatusBadge><div><b>{item.title}</b><p>{item.detail}</p><small>{item.time}</small></div><Link href={item.href}>Open</Link></li>)}</ul> : <EmptyState title="Review queue clear" text="No unresolved reviews or evidence requirements." />}</section><section className={styles.panel}><header><div><small>SYSTEM WATCH</small><h2>Alerts</h2></div></header>{alerts.length ? <ul className={styles.alerts}>{alerts.map(([tone, heading, message, href]) => <li key={heading}><StatusBadge tone={tone}>{tone === "danger" ? "Critical" : tone === "warning" ? "Attention" : "Info"}</StatusBadge><div><b>{heading}</b><p>{message}</p></div><Link href={href}>Open</Link></li>)}</ul> : <EmptyState title="No active alerts" text="The current strategy and daily journal state have no integrity warnings." />}</section></aside>
       </div>
