@@ -339,7 +339,7 @@ export async function createTrade(formData: FormData) {
     const metadata = await prisma.instrumentMetadata.findFirst({ where: { strategyVersionId: candidate.strategyVersionId, symbol: candidate.instrument, active: true } });
     if (!metadata) throw new Error("Net PnL calculation is unavailable: instrument metadata is missing.");
     pnl = calculateNetPnl({ direction: candidate.direction, entryPrice: entry, exitPrice: number(formData.get("exitPrice"))!, quantity: number(formData.get("positionSize")) ?? candidate.plannedPositionSize ?? 1, fees: number(formData.get("fees")), commission: number(formData.get("commission")), swapFunding: number(formData.get("swapFunding")), metadata });
-    if (!pnl.available) throw new Error(`Net PnL calculation is unavailable: ${pnl.missing.join(", ")} is missing.`);
+    if (!pnl.available) pnl = null; // ponytail: fall through to manualNet; metadata fields are owner-configured
   }
   const netResult = pnl?.available ? pnl.netPnl : manualNet;
   const riskAmount = number(formData.get("riskAmount"));
