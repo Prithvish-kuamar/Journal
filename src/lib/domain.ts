@@ -1,8 +1,8 @@
 export type GateAnswer = { gateKey: string; answer: boolean };
 export type GateState = { result: "IN_PROGRESS" | "PASSED" | "REJECTED"; diagnosticCompletion: "PARTIAL" | "COMPLETE"; firstFailedGateKey?: string };
 
-export function gateOutcome(responses: GateAnswer[], activeGateKeys: string[]): GateState {
-  const firstNo = responses.find((response) => !response.answer);
+export function gateOutcome(responses: GateAnswer[], activeGateKeys: string[], optionalGateKeys: string[] = []): GateState {
+  const firstNo = responses.find((response) => !response.answer && !optionalGateKeys.includes(response.gateKey));
   const complete = activeGateKeys.every((key) => responses.some((response) => response.gateKey === key));
   return {
     result: firstNo ? "REJECTED" : complete ? "PASSED" : "IN_PROGRESS",

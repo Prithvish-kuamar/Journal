@@ -99,9 +99,9 @@ export default async function SetupWorkflow({ params }: { params: Promise<{ id: 
         const response = responseByKey.get(gate.gateKey);
         return <div className="gate" key={gate.id}>
           <div>
-            <strong>{gate.displayOrder}. {gate.title}</strong>
-            <p className="muted">{gate.explanation || "Owner configuration required"}</p>
-            <small>Evidence: {gate.evidence || "Owner configuration required"} · Timeframe: {gate.timeframe || "Owner configuration required"}</small>
+            <strong>{gate.displayOrder}. {gate.title}{gate.gateKey === "G16" && <span className="muted" style={{ fontWeight: 400, fontSize: "10px", marginLeft: "6px" }}>(optional)</span>}</strong>
+            {gate.explanation && <p className="muted">{gate.explanation}</p>}
+            {(gate.evidence || gate.timeframe) && <small>{[gate.evidence && `Evidence: ${gate.evidence}`, gate.timeframe && `Timeframe: ${gate.timeframe}`].filter(Boolean).join(" · ")}</small>}
           </div>
           <div className="actions">
             {response ? <span className={`badge ${response.answer ? "ok" : "danger"}`}>{response.answer ? "Yes" : "No"}</span> : assessment.lockState === "DRAFT" ? <>

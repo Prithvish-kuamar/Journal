@@ -224,7 +224,7 @@ export async function answerGate(formData: FormData) {
   if (assessment.responses.some((response) => response.gateKey === gateKey)) redirect(`/journal/${candidateId}`);
   await prisma.gateResponse.upsert({ where: { assessmentId_gateKey: { assessmentId: assessment.id, gateKey } }, create: { assessmentId: assessment.id, gateKey, answer }, update: { answer, answeredAt: new Date() } });
   const responses = await prisma.gateResponse.findMany({ where: { assessmentId: assessment.id }, orderBy: { answeredAt: "asc" } });
-  const outcome = gateOutcome(responses.map((r) => ({ gateKey: r.gateKey, answer: r.answer })), candidate.strategyVersion.gates.map((g) => g.gateKey));
+  const outcome = gateOutcome(responses.map((r) => ({ gateKey: r.gateKey, answer: r.answer })), candidate.strategyVersion.gates.map((g) => g.gateKey), ["G16"]);
   await prisma.gateAssessment.update({ where: { id: assessment.id }, data: { result: outcome.result as GateResult, diagnosticCompletion: outcome.diagnosticCompletion, firstFailedGateKey: outcome.firstFailedGateKey ?? null } });
   if (outcome.result === "REJECTED") await prisma.setupCandidate.update({ where: { id: candidateId }, data: { lifecycle: "REJECTED" } });
   if (outcome.result === "PASSED") await prisma.setupCandidate.update({ where: { id: candidateId }, data: { lifecycle: "QUALIFIED" } });
@@ -277,7 +277,7 @@ export async function answerEmotionalQuestion(formData: FormData) {
     await prisma.gateResponse.upsert({ where: { assessmentId_gateKey: { assessmentId: assessment.id, gateKey: "G15" } }, create: { assessmentId: assessment.id, gateKey: "G15", answer: summary.result === "PASSED" }, update: { answer: summary.result === "PASSED", answeredAt: new Date() } });
   }
   const gateResponses = await prisma.gateResponse.findMany({ where: { assessmentId: assessment.id }, orderBy: { answeredAt: "asc" } });
-  const outcome = gateOutcome(gateResponses.map((response) => ({ gateKey: response.gateKey, answer: response.answer })), candidate.strategyVersion.gates.map((gate) => gate.gateKey));
+  const outcome = gateOutcome(gateResponses.map((response) => ({ gateKey: response.gateKey, answer: response.answer })), candidate.strategyVersion.gates.map((gate) => gate.gateKey), ["G16"]);
   await prisma.gateAssessment.update({ where: { id: assessment.id }, data: { result: outcome.result as GateResult, diagnosticCompletion: outcome.diagnosticCompletion, firstFailedGateKey: outcome.firstFailedGateKey ?? null } });
   if (outcome.result === "REJECTED") await prisma.setupCandidate.update({ where: { id: candidateId }, data: { lifecycle: "REJECTED" } });
   if (outcome.result === "PASSED") await prisma.setupCandidate.update({ where: { id: candidateId }, data: { lifecycle: "QUALIFIED" } });
