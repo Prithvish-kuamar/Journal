@@ -368,6 +368,18 @@ export async function addTradeLeg(formData: FormData) {
   revalidatePath(`/review?trade=${tradeId}`);
 }
 
+export async function saveCustomTargetPrice(formData: FormData) {
+  await assertOwner();
+  const versionId = z.string().parse(formData.get("versionId"));
+  const price = formData.get("customTargetPrice");
+  const version = await prisma.strategyVersion.findUniqueOrThrow({ where: { id: versionId } });
+  const config = JSON.parse(version.configuration) as Record<string, unknown>;
+  config.customTargetPrice = price ? Number(price) : null;
+  await prisma.strategyVersion.update({ where: { id: versionId }, data: { configuration: JSON.stringify(config) } });
+  revalidatePath("/settings");
+  redirect("/settings");
+}
+
 export async function deleteStrategyVersion(formData: FormData) {
   await assertOwner();
   const versionId = z.string().parse(formData.get("versionId"));

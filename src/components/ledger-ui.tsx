@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import styles from "./ledger-ui.module.css";
+export { MiniChart } from "./mini-chart";
 
 export function StatusBadge({ tone = "neutral", children }: { tone?: "neutral" | "success" | "warning" | "danger" | "info"; children: ReactNode }) {
   return <span className={`${styles.badge} ${styles[tone]}`}><span aria-hidden="true">●</span>{children}</span>;
@@ -79,12 +80,6 @@ export function LedgerScorePanel({ adherence, selectivity, completion }: { adher
   );
 }
 
-export function MiniChart({ values, tone = "success", label }: { values: number[]; tone?: "success" | "danger" | "info"; label: string }) {
-  const safe = values.length ? values : [0, 0];
-  const min = Math.min(...safe); const max = Math.max(...safe); const range = max - min || 1;
-  const points = safe.map((value, index) => `${(index / Math.max(safe.length - 1, 1)) * 100},${42 - ((value - min) / range) * 34}`).join(" ");
-  return <figure className={styles.chart} aria-label={label}><svg viewBox="0 0 100 46" preserveAspectRatio="none" role="img"><title>{label}</title><path d="M0 42H100" className={styles.gridLine}/><path d="M0 24H100" className={styles.gridLine}/><polyline points={points} className={styles[tone]} /></svg><figcaption>{values.length ? `${values.length} recorded trade${values.length === 1 ? "" : "s"}` : "No recorded trades"}</figcaption></figure>;
-}
 
 type CalendarTrade = { id: string; createdAt: Date; executedR: number | null; review?: { status: string; classification: string | null } | null; candidate: { disposition: string } };
 export function JournalCalendar({ trades, month }: { trades: CalendarTrade[]; month: Date }) {

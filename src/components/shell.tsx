@@ -11,7 +11,6 @@ const navGroups: NavGroup[] = [
   { label: "WORKSPACE", items: [{ label: "Home", href: "/", icon: "⌂" }, { label: "Daily Plan", href: "/plan", icon: "◫" }] },
   { label: "JOURNALING", items: [{ label: "Dashboard", href: "/", icon: "◈" }, { label: "Comparison", href: "/?tab=comparison", icon: "⊞" }, { label: "Analysis", href: "/?tab=analysis", icon: "◉" }, { label: "Setups", href: "/journal", icon: "◇" }, { label: "Trades", href: "/journal", icon: "↗" }, { label: "Reviews", href: "/review", icon: "✓" }, { label: "Periodic Logs", href: "/analytics", icon: "≡" }] },
   { label: "STRATEGY", items: [{ label: "Strategy Library", href: "/strategy", icon: "▤" }, { label: "Entry Models", href: "/strategy", icon: "⊹" }, { label: "Rulebook", href: "/strategy", icon: "☷" }, { label: "Evidence Library", href: "/journal", icon: "▧" }] },
-  { label: "DATA", items: [{ label: "Accounts", href: "/settings", icon: "◎" }, { label: "Manage Data", href: "/settings", icon: "▣" }, { label: "Imports", href: "/settings", icon: "⇣" }] },
   { label: "SYSTEM", items: [{ label: "Settings", href: "/settings", icon: "⚙" }, { label: "Help", href: "/help", icon: "?" }] }
 ];
 
