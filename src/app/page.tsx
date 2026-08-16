@@ -5,6 +5,7 @@ import { PerformanceDashboard } from "@/components/performance-dashboard";
 import { DashboardControls } from "@/components/dashboard-controls";
 import { AnalysisDashboard } from "@/components/analysis-dashboard";
 import { unstable_cache } from "next/cache";
+import { cache } from "react";
 import { dashboardFilters, dateRange } from "@/lib/dashboard-filters";
 import { prisma } from "@/lib/prisma";
 import { guardPage } from "@/lib/supabase/page-guard";
@@ -25,25 +26,12 @@ const cachedVersions = unstable_cache(
   () => prisma.strategyVersion.findMany({ include: { strategy: true }, orderBy: { versionNumber: "desc" } }),
   ["dash-versions"], { revalidate: 120 }
 );
-// Trades: 1-year rolling window, cached 30 s so rapid refreshes don't hammer the DB.
-// unstable_cache serialises to JSON, turning Dates into ISO strings. Re-hydrate them on the way out.
-const _cachedTradesRaw = unstable_cache(
-  () => {
-    const since = new Date();
-    since.setFullYear(since.getFullYear() - 1);
-    return prisma.trade.findMany({ where: { createdAt: { gte: since } }, orderBy: { createdAt: "asc" }, include: { candidate: { include: { optionSelections: true } }, review: true, strategyVersion: { include: { strategy: true } } } });
-  },
-  ["dash-trades-v2"], { revalidate: 30 }
-);
-const cachedTrades = async () => {
-  const rows = await _cachedTradesRaw();
-  return rows.map(t => ({
-    ...t,
-    createdAt: new Date(t.createdAt),
-    entryTimestamp: new Date(t.entryTimestamp),
-    candidate: { ...t.candidate, createdAt: new Date(t.candidate.createdAt), updatedAt: new Date(t.candidate.updatedAt) },
-  }));
-};
+// ponytail: per-request cache only — unstable_cache has a 2MB limit, trades exceed it at scale
+const cachedTrades = cache(() => {
+  const since = new Date();
+  since.setFullYear(since.getFullYear() - 1);
+  return prisma.trade.findMany({ where: { createdAt: { gte: since } }, orderBy: { createdAt: "asc" }, include: { candidate: { include: { optionSelections: true } }, review: true, strategyVersion: { include: { strategy: true } } } });
+});
 
 const title = (value: string) => value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 const safeJson = <T,>(value: string | null | undefined, fallback: T): T => { try { return value ? JSON.parse(value) as T : fallback; } catch { return fallback; } };

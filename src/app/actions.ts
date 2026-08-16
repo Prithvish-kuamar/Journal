@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { GateResult, LockState, StrategyStatus } from "@prisma/client";
-import { canCreateAddOn, gateOutcome, gradeForScores, plannedRewardRisk, rMeasurements, tradePermission } from "@/lib/domain";
+import { canCreateAddOn, canGrade, canModifyGrade, dailyThesisDecision, gateOutcome, gradeForScores, plannedRewardRisk, rMeasurements, tradePermission } from "@/lib/domain";
 import { emotionalHardLimitFailure, emotionalOutcome } from "@/lib/emotional-readiness";
 import { noEntryModel, timeframeSeconds } from "@/lib/journal-options";
 import { calculateNetPnl, tradeDurationSeconds } from "@/lib/pnl";
@@ -156,8 +156,37 @@ export async function updateEntryModel(formData: FormData) {
 export async function saveDailyPlan(formData: FormData) {
   await assertOwner();
   const input = z.object({ strategyVersionId: z.string(), account: z.string().min(1), planDate: z.string(), sessionLabel: z.string(), riskMode: z.enum(["STANDARD", "REDUCED"]), objective: z.string().optional(), readinessNotes: z.string().optional() }).parse(Object.fromEntries(formData));
-  const plan = await prisma.dailyPlan.create({ data: { strategyVersionId: input.strategyVersionId, account: input.account, planDate: new Date(input.planDate), sessionLabels: JSON.stringify([input.sessionLabel]), riskMode: input.riskMode, reducedRiskReason: input.riskMode === "REDUCED" ? String(formData.get("reducedRiskReason") || "") : null, objective: input.objective || null, readinessNotes: input.readinessNotes || null, maxTradeTheses: 2, status: "ACTIVE" } });
+  const plan = await prisma.dailyPlan.create({ data: { strategyVersionId: input.strategyVersionId, account: input.account, planDate: new Date(input.planDate), sessionLabels: JSON.stringify([input.sessionLabel]), riskMode: input.riskMode, reducedRiskReason: input.riskMode === "REDUCED" ? String(formData.get("reducedRiskReason") || "") : null, objective: input.objective || null, readinessNotes: input.readinessNotes || null, noTradeConditions: String(formData.get("noTradeConditions") || "") || null, maxTradeTheses: 2, status: "ACTIVE" } });
   await audit("DailyPlan", plan.id, "DAILY_PLAN_CREATED");
+  revalidatePath("/plan");
+}
+
+export async function upsertInstrumentPlan(formData: FormData) {
+  await assertOwner();
+  const dailyPlanId = z.string().parse(formData.get("dailyPlanId"));
+  const instrument = z.string().min(1).parse(formData.get("instrument"));
+  const id = formData.get("instrumentPlanId") as string | null;
+  const data = { dailyPlanId, instrument, bias: String(formData.get("bias") || "Neutral"), confidence: String(formData.get("confidence") || "") || null, macroNarrative: String(formData.get("macroNarrative") || "") || null, profileLevels: String(formData.get("profileLevels") || "") || null, scenarios: String(formData.get("scenarios") || ""), invalidation: String(formData.get("invalidation") || "") || null, permittedModels: "" };
+  if (id) {
+    await prisma.instrumentPlan.update({ where: { id }, data });
+  } else {
+    await prisma.instrumentPlan.create({ data });
+  }
+  revalidatePath("/plan");
+}
+
+export async function deleteInstrumentPlan(formData: FormData) {
+  await assertOwner();
+  const id = z.string().parse(formData.get("instrumentPlanId"));
+  await prisma.instrumentPlan.delete({ where: { id } });
+  revalidatePath("/plan");
+}
+
+export async function saveEndOfDay(formData: FormData) {
+  await assertOwner();
+  const planId = z.string().parse(formData.get("planId"));
+  await prisma.dailyPlan.update({ where: { id: planId }, data: { wasFollowed: formData.get("wasFollowed") === "true", endOfDayNotes: String(formData.get("endOfDayNotes") || "") || null, status: "COMPLETED" } });
+  await audit("DailyPlan", planId, "DAILY_PLAN_COMPLETED");
   revalidatePath("/plan");
 }
 
@@ -300,8 +329,9 @@ export async function completeDiagnostics(formData: FormData) {
 export async function saveGrade(formData: FormData) {
   await assertOwner();
   const candidateId = z.string().parse(formData.get("candidateId"));
-  const candidate = await prisma.setupCandidate.findUniqueOrThrow({ where: { id: candidateId }, include: { gateAssessment: true } });
-  if (candidate.gateAssessment?.result !== "PASSED") throw new Error("Only a passed assessment can be graded.");
+  const candidate = await prisma.setupCandidate.findUniqueOrThrow({ where: { id: candidateId }, include: { gateAssessment: true, grade: true } });
+  if (!canGrade(candidate.gateAssessment?.result ?? "IN_PROGRESS")) throw new Error("Only a passed assessment can be graded.");
+  if (!canModifyGrade(candidate.grade?.lockedAt)) throw new Error("Grade is locked after trade creation and cannot be changed.");
   const scores: number[] = [];
   for (let i = 1; formData.get(`score${i}`) !== null; i++) scores.push(Number(formData.get(`score${i}`)));
   const grade = gradeForScores(scores);
@@ -318,7 +348,9 @@ export async function createTrade(formData: FormData) {
   if (!candidate.entryTimeframe) throw new Error("Entry timeframe is required for an executed trade.");
   const targetError = targetDecisionError(candidate.targets);
   if (targetError) return { ok: false as const, error: targetError };
-  const restricted = candidate.gateAssessment?.result === "REJECTED" || !candidate.grade || tradePermission(candidate.grade.letter) !== "PERMITTED";
+  const limits = await todayLimitStatus(candidate.account);
+  const thesisDecision = dailyThesisDecision(limits.executedTradeTheses, false);
+  const restricted = candidate.gateAssessment?.result === "REJECTED" || !candidate.grade || tradePermission(candidate.grade.letter) !== "PERMITTED" || thesisDecision.restrictedHistoricalOnly === true;
   const overrideReason = String(formData.get("overrideReason") || "");
   if (restricted && !overrideReason) throw new Error("Restricted historical recording requires an override reason.");
   const entry = number(formData.get("entryPrice")) ?? candidate.plannedEntry;
@@ -405,7 +437,8 @@ export async function completeReview(formData: FormData) {
   const tradeId = z.string().parse(formData.get("tradeId"));
   const answers = Object.fromEntries(["macro", "zone", "profile", "archetype", "structure", "entryModel", "confirmation", "chased", "invalidation", "twoR", "size", "exposure", "management", "emotionEntry", "emotionManagement"].map((key) => [key, String(formData.get(key) || "")]));
   const existing = await prisma.tradeReview.findUnique({ where: { tradeId } });
-  const review = await prisma.tradeReview.upsert({ where: { tradeId }, create: { tradeId, status: "COMPLETE", takeAgain: String(formData.get("takeAgain")) === "yes", outcome: String(formData.get("outcome")), classification: String(formData.get("classification")), executionGrade: String(formData.get("executionGrade")), managementGrade: String(formData.get("managementGrade")), answers: JSON.stringify(answers), primaryMistake: String(formData.get("primaryMistake")), preventionRule: String(formData.get("preventionRule")), postTradeReview: String(formData.get("postTradeReview") || ""), lesson: String(formData.get("lesson")), completedAt: new Date(), lastSavedAt: new Date() }, update: { status: "COMPLETE", takeAgain: String(formData.get("takeAgain")) === "yes", outcome: String(formData.get("outcome")), classification: String(formData.get("classification")), executionGrade: String(formData.get("executionGrade")), managementGrade: String(formData.get("managementGrade")), answers: JSON.stringify(answers), primaryMistake: String(formData.get("primaryMistake")), preventionRule: String(formData.get("preventionRule")), postTradeReview: String(formData.get("postTradeReview") || ""), lesson: String(formData.get("lesson")), completedAt: new Date(), lastSavedAt: new Date() } });
+  const reviewData = { status: "COMPLETE" as const, takeAgain: String(formData.get("takeAgain")) === "yes", outcome: String(formData.get("outcome")), classification: String(formData.get("classification")), executionGrade: String(formData.get("executionGrade")), managementGrade: String(formData.get("managementGrade")), answers: JSON.stringify(answers), primaryMistake: String(formData.get("primaryMistake")), preventionRule: String(formData.get("preventionRule")), postTradeReview: String(formData.get("postTradeReview") || ""), lesson: String(formData.get("lesson")), completedAt: new Date(), lastSavedAt: new Date() };
+  const review = await prisma.tradeReview.upsert({ where: { tradeId }, create: { tradeId, ...reviewData }, update: reviewData });
   await audit("TradeReview", review.id, existing?.status === "COMPLETE" ? "REVIEW_EDITED_AFTER_COMPLETION" : "REVIEW_COMPLETED");
   revalidatePath("/review");
 }

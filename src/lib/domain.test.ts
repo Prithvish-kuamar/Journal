@@ -26,4 +26,16 @@ describe("Phase 1 business rules", () => {
   it("keeps the three R measurements separate", () => expect(rMeasurements({ netResult: 200, executedRisk: 100, plannedCapitalRisk: 200, maximumRisk: 400 })).toEqual({ executedR: 2, plannedCapitalR: 1, maximumRiskR: 0.5 }));
   it("does not fabricate planned R", () => expect(plannedRewardRisk(100, 100, 120)).toBeNull());
   it("does not allow referenced historical versions to be deleted", () => expect(canDeleteStrategyVersion(1)).toBe(false));
+  it("canGrade admits only a passed gate assessment", () => {
+    expect(canGrade("PASSED")).toBe(true);
+    expect(canGrade("IN_PROGRESS")).toBe(false);
+  });
+  it("grade cannot be changed once locked — combined lifecycle check", () => {
+    expect(canGrade("PASSED") && canModifyGrade(null)).toBe(true);
+    expect(canGrade("PASSED") && canModifyGrade(new Date())).toBe(false);
+    expect(canGrade("IN_PROGRESS") && canModifyGrade(null)).toBe(false);
+  });
+  it("add-on is always allowed regardless of thesis count", () => {
+    expect(dailyThesisDecision(5, true)).toEqual({ allowed: true, countsTowardDailyLimit: false });
+  });
 });

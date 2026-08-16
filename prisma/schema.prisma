@@ -206,6 +206,9 @@ model DailyPlan {
   maxRisk           Float?
   maxTradeTheses    Int              @default(2)
   readinessNotes    String?
+  noTradeConditions String?
+  endOfDayNotes     String?
+  wasFollowed       Boolean?
   status            String           @default("DRAFT")
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt

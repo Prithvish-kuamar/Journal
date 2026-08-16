@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireOwner } from "@/lib/supabase/server";
 import { storageAdmin, storageBucketName } from "@/lib/supabase/admin";
 import { MAX_EVIDENCE_BYTES, isOwnerEvidencePath, sanitizeFilename, signatureMatches, validateEvidenceDeclaration } from "@/lib/evidence-storage";
+import { isLateEvidence } from "@/lib/domain";
 
 const input = z.object({ evidenceId: z.string().uuid(), path: z.string().min(1), associationType: z.enum(["setup", "trade", "review"]), associatedId: z.string().min(1), originalFilename: z.string().min(1).max(255), mimeType: z.string(), byteSize: z.number().int().positive(), label: z.string().max(120).nullable().optional(), capturedAt: z.string().datetime().nullable().optional() });
 
@@ -30,7 +31,18 @@ export async function POST(request: NextRequest) {
   const reportedType = downloaded.data.type;
   if (bytes.byteLength > MAX_EVIDENCE_BYTES || (reportedType && reportedType !== parsed.data.mimeType) || !signatureMatches(bytes, parsed.data.mimeType)) { await admin.storage.from(bucket).remove([parsed.data.path]); return NextResponse.json({ error: "The uploaded file did not pass image verification." }, { status: 415 }); }
   try {
-    const evidence = await prisma.evidence.create({ data: { id: parsed.data.evidenceId, ...parents, filename: sanitizeFilename(parsed.data.originalFilename), originalFilename: sanitizeFilename(parsed.data.originalFilename), mimeType: parsed.data.mimeType, byteSize: bytes.byteLength, storageBucket: bucket, storagePath: parsed.data.path, label: parsed.data.label ?? null, capturedAt: parsed.data.capturedAt ? new Date(parsed.data.capturedAt) : null } });
+    let late = false;
+    if (parsed.data.capturedAt) {
+      const capturedAt = new Date(parsed.data.capturedAt);
+      if (parsed.data.associationType === "trade") {
+        const trade = await prisma.trade.findUnique({ where: { id: parsed.data.associatedId }, select: { entryTimestamp: true } });
+        if (trade) late = isLateEvidence(capturedAt, trade.entryTimestamp);
+      } else if (parsed.data.associationType === "setup") {
+        const setup = await prisma.setupCandidate.findUnique({ where: { id: parsed.data.associatedId }, select: { createdAt: true } });
+        if (setup) late = isLateEvidence(capturedAt, setup.createdAt);
+      }
+    }
+    const evidence = await prisma.evidence.create({ data: { id: parsed.data.evidenceId, ...parents, filename: sanitizeFilename(parsed.data.originalFilename), originalFilename: sanitizeFilename(parsed.data.originalFilename), mimeType: parsed.data.mimeType, byteSize: bytes.byteLength, storageBucket: bucket, storagePath: parsed.data.path, label: parsed.data.label ?? null, capturedAt: parsed.data.capturedAt ? new Date(parsed.data.capturedAt) : null, late } });
     await prisma.auditEvent.create({ data: { entityType: "Evidence", entityId: evidence.id, action: "EVIDENCE_UPLOADED" } });
     return NextResponse.json({ evidence });
   } catch {

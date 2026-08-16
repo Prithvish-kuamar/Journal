@@ -1,0 +1,59 @@
+.logs { display: flex; flex-direction: column; gap: var(--space-6, 1.5rem); }
+
+/* Period tabs */
+.tabs { display: flex; gap: 0; border: 1px solid var(--border); border-radius: var(--radius, 6px); overflow: hidden; width: fit-content; }
+.tab { padding: 0.375rem 1rem; font-size: 0.8125rem; font-weight: 500; color: var(--text-2); text-decoration: none; background: transparent; border: none; cursor: pointer; }
+.tab:not(:last-child) { border-right: 1px solid var(--border); }
+.tabActive { background: var(--surface-2, rgba(255,255,255,.07)); color: var(--text-1); }
+
+/* Date navigation */
+.dateNav { display: flex; align-items: center; gap: 0.75rem; }
+.dateNav a, .dateNav button { display: flex; align-items: center; justify-content: center; width: 1.75rem; height: 1.75rem; border: 1px solid var(--border); border-radius: var(--radius, 6px); color: var(--text-2); text-decoration: none; background: transparent; font-size: 1rem; line-height: 1; cursor: pointer; }
+.dateNav a:hover, .dateNav button:hover { background: var(--surface-2); color: var(--text-1); }
+.dateLabel { font-size: 0.9375rem; font-weight: 600; color: var(--text-1); min-width: 12rem; text-align: center; }
+.todayBtn { font-size: 0.75rem !important; width: auto !important; padding: 0 0.5rem !important; }
+
+/* Toolbar row */
+.toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; }
+.toolbarLeft { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+
+/* Section header */
+.sectionHead { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+.sectionHead h2 { font-size: 0.9375rem; font-weight: 600; margin: 0; }
+.sectionHead small { font-size: 0.75rem; color: var(--text-2); }
+
+/* Plan card */
+.planCard { background: var(--surface-1, rgba(255,255,255,.04)); border: 1px solid var(--border); border-radius: var(--radius, 6px); padding: 1.25rem; }
+.planCard header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+.planCard header h3 { font-size: 0.9375rem; font-weight: 600; margin: 0; }
+.planMeta { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.5rem 1.5rem; font-size: 0.8125rem; margin-bottom: 0.75rem; }
+.planMeta dt { color: var(--text-2); font-weight: 500; margin-bottom: 0.125rem; }
+.planMeta dd { color: var(--text-1); margin: 0; }
+.planActions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+
+/* Empty state */
+.empty { text-align: center; padding: 3rem 1.5rem; background: var(--surface-1); border: 1px dashed var(--border); border-radius: var(--radius, 6px); }
+.empty h3 { font-size: 0.9375rem; font-weight: 600; margin: 0 0 0.5rem; }
+.empty p { color: var(--text-2); font-size: 0.8125rem; margin: 0 0 1rem; }
+.empty .actions { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; }
+
+/* Two-column layout */
+.twoCol { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+@media (max-width: 900px) { .twoCol { grid-template-columns: 1fr; } }
+
+/* Mistake table */
+.mistakeRank { counter-reset: mistake; }
+.mistakeRank tr { counter-increment: mistake; }
+.mistakeRank td:first-child::before { content: counter(mistake); color: var(--text-2); font-size: 0.75rem; margin-right: 0.5rem; }
+
+/* R value coloring */
+.positive { color: var(--success, #4caf50); }
+.negative { color: var(--danger, #f44336); }
+.neutral { color: var(--text-2); }
+
+/* Week day row */
+.dayRow td:first-child { font-weight: 500; }
+.dayRowToday { background: var(--surface-2); }
+
+/* Scrollable table wrapper */
+.tableWrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }

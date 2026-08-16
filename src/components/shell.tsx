@@ -9,12 +9,12 @@ type NavGroup = { label: string; items: NavItem[] };
 
 const navGroups: NavGroup[] = [
   { label: "WORKSPACE", items: [{ label: "Home", href: "/", icon: "⌂" }, { label: "Daily Plan", href: "/plan", icon: "◫" }] },
-  { label: "JOURNALING", items: [{ label: "Dashboard", href: "/", icon: "◈" }, { label: "Comparison", href: "/?tab=comparison", icon: "⊞" }, { label: "Analysis", href: "/?tab=analysis", icon: "◉" }, { label: "Setups", href: "/journal", icon: "◇" }, { label: "Trades", href: "/journal", icon: "↗" }, { label: "Reviews", href: "/review", icon: "✓" }, { label: "Periodic Logs", href: "/analytics", icon: "≡" }] },
-  { label: "STRATEGY", items: [{ label: "Strategy Library", href: "/strategy", icon: "▤" }, { label: "Entry Models", href: "/strategy", icon: "⊹" }, { label: "Rulebook", href: "/strategy", icon: "☷" }, { label: "Evidence Library", href: "/journal", icon: "▧" }] },
+  { label: "JOURNALING", items: [{ label: "Dashboard", href: "/", icon: "◈" }, { label: "Comparison", href: "/?tab=comparison", icon: "⊞" }, { label: "Analysis", href: "/?tab=analysis", icon: "◉" }, { label: "Trades", href: "/journal", icon: "↗" }, { label: "Reviews", href: "/review", icon: "✓" }, { label: "Periodic Logs", href: "/analytics", icon: "≡" }] },
+  { label: "STRATEGY", items: [{ label: "Strategy Library", href: "/strategy", icon: "▤" }, { label: "Entry Models", href: "/strategy", icon: "⊹" }, { label: "Rulebook", href: "/strategy", icon: "☷" }] },
   { label: "SYSTEM", items: [{ label: "Settings", href: "/settings", icon: "⚙" }, { label: "Help", href: "/help", icon: "?" }] }
 ];
 
-const titles: Record<string, string> = { "/": "Journaling Dashboard", "/plan": "Daily Plan", "/journal": "Setup Journal", "/review": "Post-trade Review", "/strategy": "Strategy Library", "/analytics": "Analytics", "/settings": "Settings", "/help": "Help" };
+const titles: Record<string, string> = { "/": "Journaling Dashboard", "/plan": "Daily Plan", "/journal": "Setup Journal", "/review": "Post-trade Review", "/strategy": "Strategy Library", "/analytics": "Periodic Logs", "/settings": "Settings", "/help": "Help" };
 
 function activeFor(pathname: string, href: string, tab: string): boolean {
   const [hrefPath, hrefQuery] = href.split("?");

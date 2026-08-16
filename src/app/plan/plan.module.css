@@ -1,0 +1,35 @@
+.planPage { display: flex; flex-direction: column; gap: 1.5rem; }
+
+.section { display: flex; flex-direction: column; gap: 0.75rem; }
+.sectionHead { display: flex; align-items: baseline; justify-content: space-between; padding-bottom: 0.375rem; border-bottom: 1px solid var(--border); }
+.sectionHead h2 { font-size: 0.9375rem; font-weight: 600; margin: 0; }
+.sectionHead small { color: var(--text-2); font-size: 0.75rem; }
+
+.createForm { display: flex; flex-direction: column; gap: 0.75rem; }
+
+/* Active plan */
+.activePlan { display: flex; flex-direction: column; gap: 1.25rem; }
+
+.planHeader { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius, 6px); padding: 1rem 1.25rem; display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.planHeaderLeft { display: flex; flex-direction: column; gap: 0.375rem; }
+.planObjective { font-size: 1rem; font-weight: 600; margin: 0; }
+.planMeta { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+.planMeta span { display: flex; flex-direction: column; font-size: 0.875rem; }
+.planMeta small { font-size: 0.6875rem; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.125rem; }
+
+/* Cards */
+.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius, 6px); padding: 0.875rem 1rem; }
+
+/* Instrument card */
+.instrumentCard { border: 1px solid var(--border); border-radius: var(--radius, 6px); overflow: hidden; }
+.instrumentCardHeader { display: flex; align-items: center; justify-content: space-between; padding: 0.625rem 0.875rem; background: var(--surface-1); border-bottom: 1px solid var(--border); }
+.instrumentForm { padding: 0.875rem; display: flex; flex-direction: column; gap: 0.625rem; }
+.deleteBtn { font-size: 0.75rem; color: var(--text-2); background: none; border: 1px solid var(--border); border-radius: var(--radius, 6px); padding: 0.2rem 0.5rem; cursor: pointer; }
+.deleteBtn:hover { color: var(--danger, #f44336); border-color: var(--danger, #f44336); }
+
+/* Add instrument form */
+.addInstrumentForm { display: flex; align-items: center; gap: 0.5rem; padding: 0.625rem; border: 1px dashed var(--border); border-radius: var(--radius, 6px); }
+.addInstrumentForm select { height: 2rem; padding: 0 0.5rem; background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius, 6px); color: var(--text-1); font-size: 0.8125rem; }
+
+/* EOD form */
+.eodForm { display: flex; flex-direction: column; gap: 0.75rem; padding: 1rem; background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius, 6px); }

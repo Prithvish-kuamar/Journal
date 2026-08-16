@@ -15,7 +15,7 @@ export function FilterToken({ label, value }: { label: string; value: string }) 
   return <span className={styles.filterToken}><small>{label}</small>{value}<span aria-hidden="true">⌄</span></span>;
 }
 
-export function MetricStrip({ children, columns = 5 }: { children: ReactNode; columns?: 3 | 4 | 5 }) {
+export function MetricStrip({ children, columns = 5 }: { children: ReactNode; columns?: 3 | 4 | 5 | 6 }) {
   return <section className={`${styles.metricStrip} ${styles[`columns${columns}`]}`} aria-label="Journal metrics">{children}</section>;
 }
 
