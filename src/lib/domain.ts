@@ -12,11 +12,12 @@ export function gateOutcome(responses: GateAnswer[], activeGateKeys: string[], o
 }
 
 export function gradeForScores(scores: number[]): { total: number; letter: "C" | "B" | "A" | "A_PLUS" } {
-  if (scores.length !== 6 || scores.some((score) => score !== 1 && score !== 2)) throw new Error("A passed setup requires exactly six scores of 1 or 2.");
+  if (scores.length < 6 || scores.some((score) => score !== 1 && score !== 2)) throw new Error("A passed setup requires scores of 1 or 2 for each category.");
   const total = scores.reduce((sum, score) => sum + score, 0);
-  if (total === 6) return { total, letter: "C" };
-  if (total <= 8) return { total, letter: "B" };
-  if (total <= 10) return { total, letter: "A" };
+  const min = scores.length; // all-ones minimum
+  if (total === min) return { total, letter: "C" };
+  if (total <= min + 2) return { total, letter: "B" };
+  if (total <= min + 4) return { total, letter: "A" };
   return { total, letter: "A_PLUS" };
 }
 

@@ -302,7 +302,8 @@ export async function saveGrade(formData: FormData) {
   const candidateId = z.string().parse(formData.get("candidateId"));
   const candidate = await prisma.setupCandidate.findUniqueOrThrow({ where: { id: candidateId }, include: { gateAssessment: true } });
   if (candidate.gateAssessment?.result !== "PASSED") throw new Error("Only a passed assessment can be graded.");
-  const scores = [1, 2, 3, 4, 5, 6].map((i) => Number(formData.get(`score${i}`)));
+  const scores: number[] = [];
+  for (let i = 1; formData.get(`score${i}`) !== null; i++) scores.push(Number(formData.get(`score${i}`)));
   const grade = gradeForScores(scores);
   await prisma.setupGrade.upsert({ where: { candidateId }, create: { candidateId, scores: JSON.stringify(scores), ...grade, notes: String(formData.get("notes") || "") }, update: { scores: JSON.stringify(scores), ...grade, notes: String(formData.get("notes") || "") } });
   await audit("SetupGrade", candidateId, "SETUP_GRADED", undefined, undefined, grade);
