@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Shell } from "@/components/shell";
 import { Gate15Checklist } from "@/components/gate15-checklist";
@@ -173,7 +174,7 @@ export default async function SetupWorkflow({ params }: { params: Promise<{ id: 
           </div>
           <button>Close trade</button>
         </form>}
-        {setup.trade.status === "CLOSED" && <p className="notice" style={{ marginTop: "0.5rem" }}>Trade closed. Go to <a href="/review">Review</a> to complete the post-trade review.</p>}
+        {setup.trade.status === "CLOSED" && <p className="notice" style={{ marginTop: "0.5rem" }}>Trade closed. Go to <Link href="/review">Review</Link> to complete the post-trade review.</p>}
       </> : <form action={submitTrade}>
         <input type="hidden" name="candidateId" value={setup.id}/>
         <div className="grid three">
