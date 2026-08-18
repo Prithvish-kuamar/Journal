@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { Shell } from "@/components/shell";
 import { Gate15Checklist } from "@/components/gate15-checklist";
-import { answerGate, completeDiagnostics, createTrade, saveGrade } from "@/app/actions";
+import { answerGate, closeTrade, completeDiagnostics, createTrade, saveGrade } from "@/app/actions";
 import { prisma } from "@/lib/prisma";
 import { plannedRewardRisk, tradePermission } from "@/lib/domain";
 import { hasTargetDecision } from "@/lib/target-decision";
@@ -64,12 +64,15 @@ export default async function SetupWorkflow({ params }: { params: Promise<{ id: 
   };
   async function submitTrade(formData: FormData) { "use server"; const result = await createTrade(formData); if (result?.ok === false) return; }
 
+  const tradeReview = setup.trade ? await prisma.tradeReview.findUnique({ where: { tradeId: setup.trade.id }, select: { status: true } }) : null;
+  const phase = !setup.trade ? (assessment.result === "PASSED" ? "pre-trade: ready to enter" : "pre-trade: gates in progress") : setup.trade.status === "ACTIVE" ? "post-entry: trade open" : tradeReview?.status === "COMPLETE" ? "complete" : "post-trade: awaiting review";
+
   return <Shell>
     <div className="title-row">
       <div>
         <p className="eyebrow">Setup workflow · v{setup.strategyVersion.versionNumber}</p>
         <h1>{setup.instrument} {setup.direction} <span className={`badge ${assessment.result === "REJECTED" ? "danger" : assessment.result === "PASSED" ? "ok" : ""}`}>{assessment.result}</span></h1>
-        <p className="muted">Lifecycle: {setup.lifecycle} · Disposition: {setup.disposition} · Session: {setup.sessionLabel} (manual classification)</p>
+        <p className="muted">Phase: <strong>{phase}</strong> · Lifecycle: {setup.lifecycle} · Session: {setup.sessionLabel}</p>
       </div>
     </div>
 
@@ -95,7 +98,7 @@ export default async function SetupWorkflow({ params }: { params: Promise<{ id: 
       <h2>Mandatory gate · Fast / Review mode</h2>
       <p className="muted">Use Yes/No controls in rapid sequence, or read the configured owner criteria in Review mode. First No immediately and permanently rejects this assessment.</p>
       {setup.strategyVersion.gates.map((gate) => {
-        if (gate.gateKey === "G15") return <Gate15Checklist key={gate.id} candidateId={setup.id} questions={setup.strategyVersion.emotionalQuestions} responses={assessment.emotionalAssessment?.responses ?? []} summary={assessment.emotionalAssessment} assessmentLocked={assessment.lockState === "LOCKED"} hardLimit={hardLimit}/>;
+        if (gate.gateKey === "G15") return <Gate15Checklist key={gate.id} candidateId={setup.id} questions={setup.strategyVersion.emotionalQuestions} responses={assessment.emotionalAssessment?.responses ?? []} summary={assessment.emotionalAssessment} assessmentLocked={assessment.lockState === "LOCKED"} hardLimit={hardLimit} displayOrder={gate.displayOrder}/>;
         const response = responseByKey.get(gate.gateKey);
         return <div className="gate" key={gate.id}>
           <div>
@@ -127,8 +130,10 @@ export default async function SetupWorkflow({ params }: { params: Promise<{ id: 
       <TargetDecisionForm candidateId={setup.id} currentLabel={setup.targets[0]?.label || ""} />
     </section>
 
+    {assessment.result !== "PASSED" && <p className="notice">Setup grading is available only after all mandatory gates pass.</p>}
     {assessment.result === "PASSED" && <section className="card">
       <h2>Setup grading</h2>
+      {setup.strategyVersion.gradeCategories.length === 0 && <p className="muted">No grade categories configured. Add them in Strategy Edit.</p>}
       <p>Every category must be 1 or 2. A zero is impossible after gate pass.</p>
       <form action={saveGrade}>
         <input type="hidden" name="candidateId" value={setup.id}/>
@@ -147,7 +152,29 @@ export default async function SetupWorkflow({ params }: { params: Promise<{ id: 
 
     <section className="card">
       <h2>Trade entry</h2>
-      {setup.trade ? <p>Trade created: <strong>{setup.trade.status}</strong>. Grade and gates are locked.</p> : <form action={submitTrade}>
+      {setup.trade ? <>
+        <p>Trade created: <strong>{setup.trade.status}</strong>. Grade and gates are locked.</p>
+        {setup.trade.status === "ACTIVE" && <form action={closeTrade} style={{ marginTop: "1rem" }}>
+          <input type="hidden" name="tradeId" value={setup.trade.id}/>
+          <h3>Close trade</h3>
+          <div className="grid three">
+            <label className="field">Exit price<input name="exitPrice" type="number" step="any" defaultValue={setup.trade.targetPrice ?? ""}/></label>
+            <label className="field">Exit timestamp<input name="exitTimestamp" type="datetime-local"/></label>
+            <label className="field">Close status<select name="closeStatus"><option value="">Select</option><option value="stop_loss">Closed by SL</option><option value="take_profit">Closed by TP</option><option value="break_even">Closed by B.E.</option><option value="manual_exit">Manually exited</option></select></label>
+          </div>
+          <div className="grid three">
+            <label className="field">PnL method<select name="pnlMethod"><option value="CALCULATED">Calculate from instrument metadata</option><option value="MANUAL">Enter manually</option></select></label>
+            <label className="field">Currency<input name="pnlCurrency" placeholder="USD"/></label>
+            <label className="field">Manual Net PnL<input name="manualNetPnl" type="number" step="any"/></label>
+            <label className="field">Gross PnL<input name="grossPnl" type="number" step="any"/></label>
+            <label className="field">Fees<input name="fees" type="number" step="any"/></label>
+            <label className="field">Commission<input name="commission" type="number" step="any"/></label>
+            <label className="field">Swap / funding<input name="swapFunding" type="number" step="any"/></label>
+          </div>
+          <button>Close trade</button>
+        </form>}
+        {setup.trade.status === "CLOSED" && <p className="notice" style={{ marginTop: "0.5rem" }}>Trade closed. Go to <a href="/review">Review</a> to complete the post-trade review.</p>}
+      </> : <form action={submitTrade}>
         <input type="hidden" name="candidateId" value={setup.id}/>
         <div className="grid three">
           <label className="field">Entry price<input name="entryPrice" type="number" step="any" defaultValue={setup.plannedEntry ?? ""}/></label>

@@ -206,6 +206,7 @@ model DailyPlan {
   maxRisk           Float?
   maxTradeTheses    Int              @default(2)
   readinessNotes    String?
+  myScenario        String?
   noTradeConditions String?
   endOfDayNotes     String?
   wasFollowed       Boolean?

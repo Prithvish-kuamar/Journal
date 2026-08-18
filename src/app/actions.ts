@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { GateResult, LockState, StrategyStatus } from "@prisma/client";
-import { canCreateAddOn, canGrade, canModifyGrade, dailyThesisDecision, gateOutcome, gradeForScores, plannedRewardRisk, rMeasurements, tradePermission } from "@/lib/domain";
+import { canCreateAddOn, canDeleteStrategyVersion, canGrade, canModifyGrade, dailyThesisDecision, gateOutcome, gradeForScores, plannedRewardRisk, rMeasurements, tradePermission } from "@/lib/domain";
 import { emotionalHardLimitFailure, emotionalOutcome } from "@/lib/emotional-readiness";
 import { noEntryModel, timeframeSeconds } from "@/lib/journal-options";
 import { calculateNetPnl, tradeDurationSeconds } from "@/lib/pnl";
@@ -155,8 +155,8 @@ export async function updateEntryModel(formData: FormData) {
 
 export async function saveDailyPlan(formData: FormData) {
   await assertOwner();
-  const input = z.object({ strategyVersionId: z.string(), account: z.string().min(1), planDate: z.string(), sessionLabel: z.string(), riskMode: z.enum(["STANDARD", "REDUCED"]), objective: z.string().optional(), readinessNotes: z.string().optional() }).parse(Object.fromEntries(formData));
-  const plan = await prisma.dailyPlan.create({ data: { strategyVersionId: input.strategyVersionId, account: input.account, planDate: new Date(input.planDate), sessionLabels: JSON.stringify([input.sessionLabel]), riskMode: input.riskMode, reducedRiskReason: input.riskMode === "REDUCED" ? String(formData.get("reducedRiskReason") || "") : null, objective: input.objective || null, readinessNotes: input.readinessNotes || null, noTradeConditions: String(formData.get("noTradeConditions") || "") || null, maxTradeTheses: 2, status: "ACTIVE" } });
+  const input = z.object({ strategyVersionId: z.string(), account: z.string().min(1), planDate: z.string(), sessionLabel: z.string(), riskMode: z.enum(["STANDARD", "REDUCED"]), objective: z.string().optional(), readinessNotes: z.string().optional(), myScenario: z.string().optional() }).parse(Object.fromEntries(formData));
+  const plan = await prisma.dailyPlan.create({ data: { strategyVersionId: input.strategyVersionId, account: input.account, planDate: new Date(input.planDate), sessionLabels: JSON.stringify([input.sessionLabel]), riskMode: input.riskMode, reducedRiskReason: input.riskMode === "REDUCED" ? String(formData.get("reducedRiskReason") || "") : null, objective: input.objective || null, readinessNotes: input.readinessNotes || null, myScenario: input.myScenario || null, noTradeConditions: String(formData.get("noTradeConditions") || "") || null, maxTradeTheses: 2, status: "ACTIVE" } });
   await audit("DailyPlan", plan.id, "DAILY_PLAN_CREATED");
   revalidatePath("/plan");
 }
@@ -401,14 +401,47 @@ export async function addTradeLeg(formData: FormData) {
   revalidatePath(`/review?trade=${tradeId}`);
 }
 
+export async function closeTrade(formData: FormData) {
+  await assertOwner();
+  const tradeId = z.string().parse(formData.get("tradeId"));
+  const trade = await prisma.trade.findUniqueOrThrow({ where: { id: tradeId }, select: { id: true, candidateId: true, status: true, executedRisk: true, entryTimestamp: true, instrument: true, direction: true, entryPrice: true, positionSize: true, strategyVersionId: true } });
+  if (trade.status === "CLOSED") throw new Error("Trade is already closed.");
+  const exitTimestamp = String(formData.get("exitTimestamp") || "") ? new Date(String(formData.get("exitTimestamp"))) : new Date();
+  const closeStatus = String(formData.get("closeStatus") || "") || null;
+  const exitPrice = number(formData.get("exitPrice"));
+  const grossPnl = number(formData.get("grossPnl"));
+  const fees = number(formData.get("fees"));
+  const commission = number(formData.get("commission"));
+  const swapFunding = number(formData.get("swapFunding"));
+  const manualNetPnl = number(formData.get("manualNetPnl"));
+  const pnlCurrency = String(formData.get("pnlCurrency") || "") || null;
+  const pnlMethod = String(formData.get("pnlMethod") || "MANUAL");
+  let pnl: ReturnType<typeof calculateNetPnl> | null = null;
+  if (pnlMethod === "CALCULATED" && trade.entryPrice != null && exitPrice != null) {
+    const metadata = await prisma.instrumentMetadata.findFirst({ where: { strategyVersionId: trade.strategyVersionId, symbol: trade.instrument, active: true } });
+    if (metadata) {
+      pnl = calculateNetPnl({ direction: trade.direction, entryPrice: trade.entryPrice, exitPrice, quantity: trade.positionSize ?? 1, fees, commission, swapFunding, metadata });
+      if (!pnl.available) pnl = null;
+    }
+  }
+  const netResult = pnl?.available ? pnl.netPnl : manualNetPnl ?? (grossPnl !== undefined ? grossPnl - (fees ?? 0) - (commission ?? 0) - (swapFunding ?? 0) : undefined);
+  const r = rMeasurements({ netResult, executedRisk: trade.executedRisk ?? undefined, plannedCapitalRisk: trade.executedRisk ?? undefined, maximumRisk: trade.executedRisk ?? undefined });
+  const durationSeconds = trade.entryTimestamp ? tradeDurationSeconds(trade.entryTimestamp, exitTimestamp) : null;
+  await prisma.trade.update({ where: { id: tradeId }, data: { status: "CLOSED", closeStatus, exitPrice, exitTimestamp, grossPnl: pnl?.available ? pnl.grossPnl : grossPnl, fees: pnl?.available ? pnl.fees : fees, commission: pnl?.available ? pnl.commission : commission, swapFunding: pnl?.available ? pnl.swapFunding : swapFunding, netResult, executedR: r.executedR, plannedCapitalR: r.plannedCapitalR, maximumRiskR: r.maximumRiskR, calculationCurrency: pnlCurrency, pnlMethod, pnlFormula: pnl?.available ? pnl.formula : null, durationSeconds, durationSource: "MANUAL" } });
+  revalidatePath(`/journal/${trade.candidateId}`);
+}
+
 export async function saveCustomTargetPrice(formData: FormData) {
   await assertOwner();
   const versionId = z.string().parse(formData.get("versionId"));
   const price = formData.get("customTargetPrice");
   const version = await prisma.strategyVersion.findUniqueOrThrow({ where: { id: versionId } });
+  if (version.status !== StrategyStatus.DRAFT) throw new Error("Create a draft change set before changing target-price configuration.");
   const config = JSON.parse(version.configuration) as Record<string, unknown>;
+  const previousPrice = config.customTargetPrice ?? null;
   config.customTargetPrice = price ? Number(price) : null;
   await prisma.strategyVersion.update({ where: { id: versionId }, data: { configuration: JSON.stringify(config) } });
+  await audit("StrategyVersion", versionId, "CUSTOM_TARGET_PRICE_CHANGED", undefined, { customTargetPrice: previousPrice }, { customTargetPrice: config.customTargetPrice });
   revalidatePath("/settings");
   redirect("/settings");
 }
@@ -416,7 +449,34 @@ export async function saveCustomTargetPrice(formData: FormData) {
 export async function deleteStrategyVersion(formData: FormData) {
   await assertOwner();
   const versionId = z.string().parse(formData.get("versionId"));
-  const version = await prisma.strategyVersion.findUniqueOrThrow({ where: { id: versionId }, select: { strategyId: true, _count: { select: { childVersions: true } } } });
+  const version = await prisma.strategyVersion.findUniqueOrThrow({
+    where: { id: versionId },
+    select: {
+      strategyId: true,
+      status: true,
+      _count: {
+        select: {
+          childVersions: true,
+          candidates: true,
+          trades: true,
+          dailyPlans: true,
+          journalOptions: true,
+          entryModels: true,
+          gradeCategories: true,
+          gates: true,
+          emotionalQuestions: true,
+          instrumentMetadata: true,
+        }
+      }
+    }
+  });
+  if (version.status !== StrategyStatus.DRAFT) throw new Error("Only draft strategy versions can be deleted. Unpublish or archive first.");
+  const historicalReferenceCount =
+    version._count.candidates + version._count.trades + version._count.dailyPlans +
+    version._count.journalOptions + version._count.entryModels +
+    version._count.gradeCategories + version._count.gates +
+    version._count.emotionalQuestions + version._count.instrumentMetadata;
+  if (!canDeleteStrategyVersion(historicalReferenceCount)) throw new Error("This version has historical references and cannot be deleted.");
   if (version._count.childVersions > 0) throw new Error("Cannot delete a version that has child versions.");
   await prisma.$transaction(async (tx) => {
     await tx.trade.deleteMany({ where: { strategyVersionId: versionId } });
@@ -426,6 +486,8 @@ export async function deleteStrategyVersion(formData: FormData) {
     await tx.instrumentMetadata.deleteMany({ where: { strategyVersionId: versionId } });
     await tx.strategyVersion.delete({ where: { id: versionId } });
   });
+  const previousCounts = { status: version.status, candidates: version._count.candidates, trades: version._count.trades, dailyPlans: version._count.dailyPlans, journalOptions: version._count.journalOptions, entryModels: version._count.entryModels, gradeCategories: version._count.gradeCategories, gates: version._count.gates, emotionalQuestions: version._count.emotionalQuestions, instrumentMetadata: version._count.instrumentMetadata, childVersions: version._count.childVersions };
+  await audit("StrategyVersion", versionId, "STRATEGY_VERSION_DELETED", undefined, { previousCounts });
   const remaining = await prisma.strategyVersion.count({ where: { strategyId: version.strategyId } });
   if (remaining === 0) await prisma.strategy.delete({ where: { id: version.strategyId } });
   revalidatePath("/strategy");

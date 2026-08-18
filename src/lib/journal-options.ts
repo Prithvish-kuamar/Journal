@@ -7,7 +7,8 @@ export const INSTRUMENT_OPTIONS: OptionSeed[] = [
   ...options("INSTRUMENT", ["GBP/USD", "GBP/JPY", "GBP/AUD", "GBP/NZD"], "#77558c"),
   ...options("INSTRUMENT", ["USD/JPY", "USD/CHF", "USD/CAD"], "#aa5d57"),
   ...options("INSTRUMENT", ["NZD/USD", "NZD/CHF", "NZD/CAD", "NZD/JPY"], "#9b754f"),
-  ...options("INSTRUMENT", ["BTC/USD", "MGC", "6B", "6E", "6A", "6C", "6J", "6N", "6S"], "#567ba4")
+  ...options("INSTRUMENT", ["GC", "MGC", "ES", "MES", "NQ", "MNQ"], "#567ba4"),
+  ...options("INSTRUMENT", ["BTC/USD", "6B", "6E", "6A", "6C", "6J", "6N", "6S"], "#567ba4")
 ];
 
 export const ENTRY_TIMEFRAMES = ["1m", "2m", "3m", "5m", "15m", "30m", "1H", "2H", "4H", "8H", "12H", "1D", "Custom"] as const;

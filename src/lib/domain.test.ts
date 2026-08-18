@@ -25,7 +25,7 @@ describe("Phase 1 business rules", () => {
   it("marks screenshots late from capture time rather than upload optimism", () => expect(isLateEvidence(new Date("2026-08-02T10:01:00Z"), new Date("2026-08-02T10:00:00Z"))).toBe(true));
   it("keeps the three R measurements separate", () => expect(rMeasurements({ netResult: 200, executedRisk: 100, plannedCapitalRisk: 200, maximumRisk: 400 })).toEqual({ executedR: 2, plannedCapitalR: 1, maximumRiskR: 0.5 }));
   it("does not fabricate planned R", () => expect(plannedRewardRisk(100, 100, 120)).toBeNull());
-  it("does not allow referenced historical versions to be deleted", () => expect(canDeleteStrategyVersion(1)).toBe(false));
+  it("does not allow referenced historical versions to be deleted", () => { expect(canDeleteStrategyVersion(1)).toBe(false); expect(canDeleteStrategyVersion(0)).toBe(true); });
   it("canGrade admits only a passed gate assessment", () => {
     expect(canGrade("PASSED")).toBe(true);
     expect(canGrade("IN_PROGRESS")).toBe(false);

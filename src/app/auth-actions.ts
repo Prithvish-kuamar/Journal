@@ -3,12 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient, requireOwner } from "@/lib/supabase/server";
-import { safeReturnPath } from "@/lib/supabase/auth-utils";
+import { safeReturnPath, normalizeEmail } from "@/lib/supabase/auth-utils";
 
 type LoginState = { error: string };
 
 export async function login(_: LoginState, formData: FormData): Promise<LoginState> {
-  const email = String(formData.get("email") || "").trim();
+  const email = normalizeEmail(String(formData.get("email") || ""));
   const password = String(formData.get("password") || "");
   const next = safeReturnPath(String(formData.get("next") || null));
   if (!email || !password) return { error: "Unable to sign in with those credentials." };

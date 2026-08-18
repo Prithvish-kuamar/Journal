@@ -1,3 +1,5 @@
+.claude/
+.poolside/
 node_modules/
 .pnpm-store/
 .next/

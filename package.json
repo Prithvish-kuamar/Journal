@@ -20,7 +20,8 @@
     "db:postgres:status": "prisma migrate status",
     "db:sqlite-to-postgres": "node scripts/migrate-sqlite-to-postgres.mjs",
     "storage:verify": "node --env-file=.env scripts/verify-storage-config.mjs",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "db:seed:prod": "tsx prisma/seed-prod.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.12.0",

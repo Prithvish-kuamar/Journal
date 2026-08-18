@@ -1,4 +1,4 @@
-export const EXECUTION_INSTRUMENTS = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD", "AUDUSD", "NZDUSD"] as const;
+export const EXECUTION_INSTRUMENTS = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD", "AUDUSD", "NZDUSD", "GC", "MGC", "ES", "MES", "NQ", "MNQ"] as const;
 export const SESSION_LABELS = ["Asia", "London", "New York AM"] as const;
 export { EMOTIONAL_READINESS_QUESTIONS } from "@/lib/emotional-readiness";
 

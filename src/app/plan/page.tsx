@@ -123,6 +123,7 @@ function CreatePlanForm({ strategyVersionId }: { strategyVersionId: string; perm
           <label className="field">Daily objective<input name="objective" placeholder="What am I focused on today?" /></label>
         </div>
         <label className="field">Personal readiness<textarea name="readinessNotes" placeholder="Energy, focus, emotional state — am I ready to trade?" rows={2} /></label>
+        <label className="field">My scenario<textarea name="myScenario" placeholder="Your thoughts, emotions, and reflections" rows={3} /></label>
         <label className="field">No-trade conditions<textarea name="noTradeConditions" placeholder={"Conditions where I will NOT trade today:\n— Price between major levels\n— Macro bias unclear\n— High-impact news risk"} rows={4} /></label>
         <p className="muted" style={{ fontSize: "0.8125rem" }}>Session is a manual classification. Account risk basis is set in Strategy.</p>
         <button>Activate daily plan</button>
@@ -160,6 +161,14 @@ function ActivePlan({ plan, permittedInstruments }: { plan: PlanWithInstruments;
         <div className={styles.card}>
           <strong style={{ fontSize: "0.8125rem" }}>Readiness</strong>
           <p className="muted" style={{ fontSize: "0.8125rem", margin: "0.25rem 0 0", whiteSpace: "pre-wrap" }}>{plan.readinessNotes}</p>
+        </div>
+      )}
+
+      {/* My scenario */}
+      {plan.myScenario && (
+        <div className={styles.card}>
+          <strong style={{ fontSize: "0.8125rem" }}>My scenario</strong>
+          <p className="muted" style={{ fontSize: "0.8125rem", margin: "0.25rem 0 0", whiteSpace: "pre-wrap" }}>{plan.myScenario}</p>
         </div>
       )}
 
