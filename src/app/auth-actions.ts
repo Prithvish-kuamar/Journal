@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createClient, requireOwner } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { safeReturnPath, normalizeEmail } from "@/lib/supabase/auth-utils";
 
 type LoginState = { error: string };
@@ -15,8 +15,11 @@ export async function login(_: LoginState, formData: FormData): Promise<LoginSta
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { error: "Unable to sign in with those credentials." };
-  const owner = await requireOwner();
-  if (owner.status !== "ok") { await supabase.auth.signOut(); return { error: "Unable to sign in with those credentials." }; }
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user || normalizeEmail(user.email) !== normalizeEmail(process.env.OWNER_EMAIL ?? "")) {
+    await supabase.auth.signOut();
+    return { error: "Unable to sign in with those credentials." };
+  }
   revalidatePath("/", "layout");
   redirect(next);
 }
