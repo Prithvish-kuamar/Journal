@@ -14,7 +14,7 @@ export async function login(_: LoginState, formData: FormData): Promise<LoginSta
   if (!email || !password) return { error: "Unable to sign in with those credentials." };
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) return { error: "Unable to sign in with those credentials." };
+  if (error) return { error: error.message };
   const { data: { user } } = await supabase.auth.getUser();
   if (!user || normalizeEmail(user.email) !== normalizeEmail(process.env.OWNER_EMAIL ?? "")) {
     await supabase.auth.signOut();
