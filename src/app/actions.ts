@@ -523,3 +523,29 @@ export async function completeReview(formData: FormData) {
   await audit(ownerId, "TradeReview", review.id, existing?.status === "COMPLETE" ? "REVIEW_EDITED_AFTER_COMPLETION" : "REVIEW_COMPLETED");
   revalidatePath("/review");
 }
+
+export async function deleteTrade(formData: FormData) {
+  const ownerId = await requireOwnerId();
+  const tradeId = z.string().parse(formData.get("tradeId"));
+  const trade = await prisma.trade.findFirstOrThrow({ where: { id: tradeId, ownerId }, select: { id: true, candidateId: true, status: true, instrument: true, direction: true, netResult: true, entryTimestamp: true } });
+  const assessment = await prisma.gateAssessment.findUnique({ where: { candidateId: trade.candidateId }, select: { id: true } });
+  await prisma.$transaction(async (tx) => {
+    // Legs, review and evidence rows cascade with the trade.
+    // ponytail: uploaded evidence objects stay in storage — orphaned bytes are
+    // cheaper than an unrecoverable delete. Add a storage sweep if it ever matters.
+    await tx.trade.delete({ where: { id: tradeId } });
+    // Undo what createTrade locked, so the candidate is workable again.
+    await tx.setupCandidate.update({ where: { id: trade.candidateId }, data: { disposition: "NONE" } });
+    await tx.setupGrade.updateMany({ where: { candidateId: trade.candidateId }, data: { lockedAt: null } });
+    if (assessment) {
+      await tx.gateAssessment.update({ where: { candidateId: trade.candidateId }, data: { lockState: "DRAFT" } });
+      await tx.emotionalAssessment.updateMany({ where: { assessmentId: assessment.id }, data: { lockState: "DRAFT" } });
+    }
+  });
+  await audit(ownerId, "Trade", tradeId, "TRADE_DELETED", String(formData.get("reason") || "") || undefined, trade);
+  revalidatePath(`/journal/${trade.candidateId}`);
+  revalidatePath("/journal");
+  revalidatePath("/review");
+  revalidatePath("/analytics");
+  revalidatePath("/");
+}

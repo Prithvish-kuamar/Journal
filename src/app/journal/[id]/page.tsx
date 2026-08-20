@@ -5,6 +5,7 @@ import { Gate15Checklist } from "@/components/gate15-checklist";
 import { answerGate, closeTrade, completeDiagnostics, createTrade, saveGrade } from "@/app/actions";
 import { prisma } from "@/lib/prisma";
 import { plannedRewardRisk, tradePermission } from "@/lib/domain";
+import { DeleteTradeButton } from "@/app/journal/delete-trade-button";
 import { hasTargetDecision } from "@/lib/target-decision";
 import { gradeText } from "@/lib/grade-copy";
 import { guardPage } from "@/lib/supabase/page-guard";
@@ -155,6 +156,7 @@ export default async function SetupWorkflow({ params }: { params: Promise<{ id: 
       <h2>Trade entry</h2>
       {setup.trade ? <>
         <p>Trade created: <strong>{setup.trade.status}</strong>. Grade and gates are locked.</p>
+        <p style={{ marginTop: "-0.5rem" }}><DeleteTradeButton tradeId={setup.trade.id} label={`${setup.instrument} ${setup.direction}`}/></p>
         {setup.trade.status === "ACTIVE" && <form action={closeTrade} style={{ marginTop: "1rem" }}>
           <input type="hidden" name="tradeId" value={setup.trade.id}/>
           <h3>Close trade</h3>
