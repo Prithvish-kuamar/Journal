@@ -1,7 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { parseAppEnv } from "@/lib/env";
-import { normalizeEmail } from "@/lib/supabase/auth-utils";
 
 const _env = parseAppEnv();
 
@@ -17,15 +16,17 @@ export async function createClient() {
   });
 }
 
-export type OwnerAuth =
+export type UserAuth =
   | { user: { id: string; email?: string | null }; status: "ok" }
-  | { user: null; status: "unauthenticated" | "forbidden" };
+  | { user: null; status: "unauthenticated" };
 
-export async function requireOwner(): Promise<OwnerAuth> {
+/**
+ * The signed-in user. Their Supabase auth id is the ownerId every row is
+ * scoped by, so callers must pass it into every query rather than trusting
+ * a record id from the request.
+ */
+export async function requireUser(): Promise<UserAuth> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { user: null, status: "unauthenticated" };
-  return normalizeEmail(user.email) === normalizeEmail(_env.OWNER_EMAIL)
-    ? { user, status: "ok" }
-    : { user: null, status: "forbidden" };
+  return user ? { user, status: "ok" } : { user: null, status: "unauthenticated" };
 }

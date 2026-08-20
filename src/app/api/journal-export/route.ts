@@ -1,15 +1,16 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { dashboardFilters, dateRange } from "@/lib/dashboard-filters";
-import { requireOwner } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/supabase/server";
 
 const cell = (value: string | number | null | undefined) => `"${String(value ?? "").replaceAll('"', '""')}"`;
 export async function GET(request: NextRequest) {
-  const owner = await requireOwner();
-  if (owner.status !== "ok") return new Response(owner.status === "unauthenticated" ? "Unauthorized" : "Forbidden", { status: owner.status === "unauthenticated" ? 401 : 403 });
+  const auth = await requireUser();
+  if (auth.status !== "ok") return new Response("Unauthorized", { status: 401 });
+  const ownerId = auth.user.id;
   const filters = dashboardFilters(Object.fromEntries(request.nextUrl.searchParams.entries())); const range = dateRange(filters);
   if (!range.valid) return new Response("Custom start date must be before the end date.", { status: 400 });
-  const trades = await prisma.trade.findMany({ where: { status: "CLOSED" }, include: { candidate: { include: { optionSelections: true, targets: true } }, strategyVersion: { include: { strategy: true } }, review: true }, orderBy: { createdAt: "desc" } });
+  const trades = await prisma.trade.findMany({ where: { ownerId, status: "CLOSED" }, include: { candidate: { include: { optionSelections: true, targets: true } }, strategyVersion: { include: { strategy: true } }, review: true }, orderBy: { createdAt: "desc" } });
   const visible = trades.filter((trade) => (!filters.account || trade.account === filters.account) && (!filters.version || trade.strategyVersionId === filters.version) && (!range.start || trade.createdAt >= range.start) && (!range.end || trade.createdAt < range.end) && (filters.source !== "verified" || trade.review?.status === "COMPLETE") && (filters.source !== "demo" || trade.candidate.thesis?.startsWith("DEMO:")));
   const labels = (trade: typeof visible[number], category: string) => trade.candidate.optionSelections.filter((selection) => selection.category === category).map((selection) => selection.labelSnapshot).join(" | ");
   const headings = ["Trade ID", "Date", "Symbol", "Entry timeframe", "Direction", "Strategy", "Strategy version", "Entry model", "Supply & Demand tags", "Macro Fundamental Bias tags", "Bias Evaluation", "Setup Type", "Entry Confluence", "Optional Confluences", "Entry Evaluation", "Target selections", "Custom target", "Close Status", "Trade Duration seconds", "Gross PnL", "Fees", "Net PnL", "Calculation method", "Setup grade", "Validity", "Outcome", "Executed R", "Planned-Capital R", "Maximum-Risk R", "Execution grade", "Management grade", "Primary mistake", "Post-Trade Review", "Lesson"];

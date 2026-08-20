@@ -83,15 +83,19 @@ enum ReviewStatus {
 
 model Strategy {
   id          String            @id @default(cuid())
+  ownerId     String
   name        String
   description String?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
   versions    StrategyVersion[]
+
+  @@index([ownerId])
 }
 
 model StrategyVersion {
   id                   String                @id @default(cuid())
+  ownerId              String
   strategyId           String
   strategy             Strategy              @relation(fields: [strategyId], references: [id], onDelete: Restrict)
   versionNumber        Int
@@ -117,6 +121,7 @@ model StrategyVersion {
   instrumentMetadata   InstrumentMetadata[]
 
   @@unique([strategyId, versionNumber])
+  @@index([ownerId])
 }
 
 model StrategyRule {
@@ -194,6 +199,7 @@ model EntryModel {
 
 model DailyPlan {
   id                String           @id @default(cuid())
+  ownerId           String
   strategyVersionId String
   strategyVersion   StrategyVersion  @relation(fields: [strategyVersionId], references: [id], onDelete: Restrict)
   planDate          DateTime
@@ -215,6 +221,8 @@ model DailyPlan {
   updatedAt         DateTime         @updatedAt
   instruments       InstrumentPlan[]
   candidates        SetupCandidate[]
+
+  @@index([ownerId])
 }
 
 model InstrumentPlan {
@@ -234,6 +242,7 @@ model InstrumentPlan {
 
 model SetupCandidate {
   id                      String                     @id @default(cuid())
+  ownerId                 String
   strategyVersionId       String
   strategyVersion         StrategyVersion            @relation(fields: [strategyVersionId], references: [id], onDelete: Restrict)
   dailyPlanId             String?
@@ -273,6 +282,8 @@ model SetupCandidate {
   evidence                Evidence[]
   optionSelections        CandidateOptionSelection[]
   targets                 CandidateTarget[]
+
+  @@index([ownerId])
 }
 
 model GateAssessment {
@@ -368,6 +379,7 @@ model SetupGrade {
 
 model Trade {
   id                    String          @id @default(cuid())
+  ownerId               String
   candidateId           String          @unique
   candidate             SetupCandidate  @relation(fields: [candidateId], references: [id], onDelete: Restrict)
   strategyVersionId     String
@@ -414,6 +426,8 @@ model Trade {
   legs                  TradeLeg[]
   review                TradeReview?
   evidence              Evidence[]
+
+  @@index([ownerId])
 }
 
 model JournalOption {
@@ -545,6 +559,7 @@ model Evidence {
 
 model AuditEvent {
   id         String   @id @default(cuid())
+  ownerId    String
   actor      String   @default("owner")
   timestamp  DateTime @default(now())
   entityType String
@@ -554,4 +569,6 @@ model AuditEvent {
   next       String?
   reason     String?
   metadata   String?
+
+  @@index([ownerId])
 }

@@ -6,8 +6,8 @@ import { guardPage } from "@/lib/supabase/page-guard";
 export const dynamic = "force-dynamic";
 
 export default async function EditStrategyPage() {
-  await guardPage();
-  const version = await prisma.strategyVersion.findFirst({ include: { gates: { orderBy: { displayOrder: "asc" } }, emotionalQuestions: { orderBy: { displayOrder: "asc" } }, gradeCategories: { orderBy: { displayOrder: "asc" } }, entryModels: { orderBy: { code: "asc" } } }, orderBy: { versionNumber: "desc" } });
+  const ownerId = await guardPage();
+  const version = await prisma.strategyVersion.findFirst({ where: { ownerId }, include: { gates: { orderBy: { displayOrder: "asc" } }, emotionalQuestions: { orderBy: { displayOrder: "asc" } }, gradeCategories: { orderBy: { displayOrder: "asc" } }, entryModels: { orderBy: { code: "asc" } } }, orderBy: { versionNumber: "desc" } });
   if (!version) return <Shell><p className="notice">No strategy exists yet. Create one from Strategy Library.</p></Shell>;
   return <Shell>
     <p className="eyebrow">Strategy Builder · {version.status === "DRAFT" ? "Draft" : version.status} v{version.versionNumber}</p>

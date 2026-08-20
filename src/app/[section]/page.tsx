@@ -13,12 +13,12 @@ const stubs: Record<string, { title: string; detail: string; action: string; hre
 };
 
 export default async function LaterPhase({ params }: { params: Promise<{ section: string }> }) {
-  await guardPage();
+  const ownerId = await guardPage();
   const { section } = await params;
 
   if (section === "settings") {
-    const published = await prisma.strategyVersion.findFirst({ where: { status: "PUBLISHED" }, orderBy: { versionNumber: "desc" }, select: { id: true, configuration: true } });
-    const draft = await prisma.strategyVersion.findFirst({ where: { status: "DRAFT" }, orderBy: { versionNumber: "desc" }, select: { id: true, versionNumber: true, configuration: true } });
+    const published = await prisma.strategyVersion.findFirst({ where: { ownerId, status: "PUBLISHED" }, orderBy: { versionNumber: "desc" }, select: { id: true, configuration: true } });
+    const draft = await prisma.strategyVersion.findFirst({ where: { ownerId, status: "DRAFT" }, orderBy: { versionNumber: "desc" }, select: { id: true, versionNumber: true, configuration: true } });
     const config = published ? JSON.parse(published.configuration) as Record<string, unknown> : {};
     const currentPublished = config.customTargetPrice != null ? String(config.customTargetPrice) : "";
     const draftConfig = draft ? JSON.parse(draft.configuration) as Record<string, unknown> : {};

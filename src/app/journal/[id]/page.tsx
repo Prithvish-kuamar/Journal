@@ -14,10 +14,10 @@ import { TargetDecisionForm } from "@/components/target-decision-form";
 export const dynamic = "force-dynamic";
 
 export default async function SetupWorkflow({ params }: { params: Promise<{ id: string }> }) {
-  await guardPage();
+  const ownerId = await guardPage();
   const { id } = await params;
-  const setup = await prisma.setupCandidate.findUnique({
-    where: { id },
+  const setup = await prisma.setupCandidate.findFirst({
+    where: { id, ownerId },
     include: {
       strategyVersion: {
         include: {
@@ -49,7 +49,7 @@ export default async function SetupWorkflow({ params }: { params: Promise<{ id: 
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
   const dailyTrades = await prisma.trade.findMany({
-    where: { account: setup.account, entryTimestamp: { gte: startOfDay } },
+    where: { ownerId, account: setup.account, entryTimestamp: { gte: startOfDay } },
     select: { status: true, netResult: true },
     orderBy: { entryTimestamp: "desc" }
   });

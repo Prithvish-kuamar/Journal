@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 import { safeReturnPath } from "@/lib/supabase/auth-utils";
 
-const publicPaths = ["/login"];
+const publicPaths = ["/login", "/signup"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -20,7 +20,7 @@ export async function updateSession(request: NextRequest) {
     }
   });
   // getSession reads the JWT from the cookie without a network round-trip.
-  // requireOwner() calls getUser() (network-verified) on every actual page/API handler.
+  // requireUser() calls getUser() (network-verified) on every actual page/API handler.
   const { data: { session } } = await supabase.auth.getSession();
   const user = session?.user ?? null;
   const pathname = request.nextUrl.pathname;
@@ -32,12 +32,7 @@ export async function updateSession(request: NextRequest) {
     login.searchParams.set("next", safeReturnPath(`${pathname}${request.nextUrl.search}`));
     return NextResponse.redirect(login);
   }
-  const owner = process.env.OWNER_EMAIL?.trim().toLowerCase();
-  if (!owner || user.email?.trim().toLowerCase() !== owner) {
-    if (pathname.startsWith("/api/")) return new NextResponse("Forbidden", { status: 403 });
-    const login = new URL("/login", request.url);
-    login.searchParams.set("error", "unauthorized");
-    return NextResponse.redirect(login);
-  }
+  // Any authenticated account may proceed. Which rows they can see is decided
+  // per-query by the ownerId scope, not here.
   return response;
 }

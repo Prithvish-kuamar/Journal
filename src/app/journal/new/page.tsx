@@ -10,8 +10,8 @@ import { guardPage } from "@/lib/supabase/page-guard";
 export const dynamic = "force-dynamic";
 
 export default async function NewSetupPage() {
-  await guardPage();
-  const [strategy, plans] = await Promise.all([prisma.strategyVersion.findFirst({ where: { status: "PUBLISHED" }, orderBy: { versionNumber: "desc" }, include: { entryModels: { where: { active: true }, orderBy: { code: "asc" } } } }), prisma.dailyPlan.findMany({ where: { status: "ACTIVE" }, orderBy: { planDate: "desc" } })]);
+  const ownerId = await guardPage();
+  const [strategy, plans] = await Promise.all([prisma.strategyVersion.findFirst({ where: { ownerId, status: "PUBLISHED" }, orderBy: { versionNumber: "desc" }, include: { entryModels: { where: { active: true }, orderBy: { code: "asc" } } } }), prisma.dailyPlan.findMany({ where: { ownerId, status: "ACTIVE" }, orderBy: { planDate: "desc" } })]);
   let journalOptions = strategy ? await prisma.journalOption.findMany({ where: { strategyVersionId: strategy.id, active: true, archivedAt: null }, orderBy: { displayOrder: "asc" } }) : [];
   if (strategy && journalOptions.length === 0) {
     await prisma.journalOption.createMany({ data: JOURNAL_OPTION_LIBRARY.map((option, index) => ({ strategyVersionId: strategy.id, ...option, displayOrder: index + 1 })) });

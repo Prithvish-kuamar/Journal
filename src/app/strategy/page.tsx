@@ -13,8 +13,9 @@ const asList = (value: unknown) => Array.isArray(value) ? value.filter((item): i
 const r = (value: number) => `${value >= 0 ? "+" : ""}${value.toFixed(2)}R`;
 
 export default async function StrategyPage() {
-  await guardPage();
+  const ownerId = await guardPage();
   const versions = await prisma.strategyVersion.findMany({
+    where: { ownerId },
     include: { strategy: true, rules: { orderBy: { displayOrder: "asc" } }, gates: { orderBy: { displayOrder: "asc" } }, gradeCategories: { orderBy: { displayOrder: "asc" } }, entryModels: { orderBy: { code: "asc" } }, trades: { include: { review: true } } },
     orderBy: { versionNumber: "desc" }
   });

@@ -91,20 +91,20 @@ function metrics(trades: TradeFull[]) {
 
 // ─── Data fetching ────────────────────────────────────────────────────────────
 
-async function fetchRange(start: Date, end: Date) {
+async function fetchRange(ownerId: string, start: Date, end: Date) {
   const [plans, candidates, trades] = await Promise.all([
     prisma.dailyPlan.findMany({
-      where: { planDate: { gte: start, lt: end } },
+      where: { ownerId, planDate: { gte: start, lt: end } },
       include: { instruments: true },
       orderBy: { planDate: "asc" },
     }),
     prisma.setupCandidate.findMany({
-      where: { createdAt: { gte: start, lt: end } },
+      where: { ownerId, createdAt: { gte: start, lt: end } },
       include: { grade: true, trade: { include: { review: true } } },
       orderBy: { createdAt: "asc" },
     }),
     prisma.trade.findMany({
-      where: { entryTimestamp: { gte: start, lt: end } },
+      where: { ownerId, entryTimestamp: { gte: start, lt: end } },
       include: { review: true },
       orderBy: { entryTimestamp: "asc" },
     }),
@@ -274,7 +274,7 @@ export default async function PeriodicLogsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await guardPage();
+  const ownerId = await guardPage();
   const sp = await searchParams;
   const rawPeriod = typeof sp.period === "string" ? sp.period : "daily";
   const period = ["daily", "weekly", "monthly"].includes(rawPeriod) ? rawPeriod : "daily";
@@ -318,7 +318,7 @@ export default async function PeriodicLogsPage({
         ? toParam(weekStart(today)) === toParam(rangeStart)
         : toParam(monthStart(today)) === toParam(rangeStart);
 
-  const { plans, candidates, trades } = await fetchRange(rangeStart, rangeEnd);
+  const { plans, candidates, trades } = await fetchRange(ownerId, rangeStart, rangeEnd);
 
   const m = metrics(trades);
   const hasData = trades.length > 0 || candidates.length > 0 || plans.length > 0;

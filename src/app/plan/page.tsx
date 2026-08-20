@@ -30,13 +30,13 @@ function asList(v: unknown): string[] {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function PlanPage() {
-  await guardPage();
+  const ownerId = await guardPage();
   const [todayStart, todayEnd] = todayUtcRange();
 
   const [strategy, todayPlan, recentPlans] = await Promise.all([
-    prisma.strategyVersion.findFirst({ where: { status: "PUBLISHED" }, orderBy: { versionNumber: "desc" } }),
-    prisma.dailyPlan.findFirst({ where: { planDate: { gte: todayStart, lt: todayEnd } }, include: { instruments: true }, orderBy: { createdAt: "desc" } }),
-    prisma.dailyPlan.findMany({ orderBy: { planDate: "desc" }, take: 12, include: { strategyVersion: true } }),
+    prisma.strategyVersion.findFirst({ where: { ownerId, status: "PUBLISHED" }, orderBy: { versionNumber: "desc" } }),
+    prisma.dailyPlan.findFirst({ where: { ownerId, planDate: { gte: todayStart, lt: todayEnd } }, include: { instruments: true }, orderBy: { createdAt: "desc" } }),
+    prisma.dailyPlan.findMany({ where: { ownerId }, orderBy: { planDate: "desc" }, take: 12, include: { strategyVersion: true } }),
   ]);
 
   const config = strategy ? parseConfig(strategy.configuration) : {};

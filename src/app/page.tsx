@@ -14,23 +14,26 @@ import styles from "./home.module.css";
 export const dynamic = "force-dynamic";
 
 // Strategies and versions rarely change — cache for 2 minutes.
+// ownerId is passed as an argument, not closed over: unstable_cache folds the
+// call arguments into the cache key, so each account gets its own entry. A
+// fixed key here would serve one account's strategy to every other account.
 const cachedStrategy = unstable_cache(
-  () => prisma.strategyVersion.findFirst({ where: { status: "PUBLISHED" }, orderBy: { versionNumber: "desc" } }),
+  (ownerId: string) => prisma.strategyVersion.findFirst({ where: { ownerId, status: "PUBLISHED" }, orderBy: { versionNumber: "desc" } }),
   ["dash-strategy"], { revalidate: 120 }
 );
 const cachedDrafts = unstable_cache(
-  () => prisma.strategyVersion.count({ where: { status: "DRAFT" } }),
+  (ownerId: string) => prisma.strategyVersion.count({ where: { ownerId, status: "DRAFT" } }),
   ["dash-drafts"], { revalidate: 120 }
 );
 const cachedVersions = unstable_cache(
-  () => prisma.strategyVersion.findMany({ include: { strategy: true }, orderBy: { versionNumber: "desc" } }),
+  (ownerId: string) => prisma.strategyVersion.findMany({ where: { ownerId }, include: { strategy: true }, orderBy: { versionNumber: "desc" } }),
   ["dash-versions"], { revalidate: 120 }
 );
 // ponytail: per-request cache only — unstable_cache has a 2MB limit, trades exceed it at scale
-const cachedTrades = cache(() => {
+const cachedTrades = cache((ownerId: string) => {
   const since = new Date();
   since.setFullYear(since.getFullYear() - 1);
-  return prisma.trade.findMany({ where: { createdAt: { gte: since } }, orderBy: { createdAt: "asc" }, include: { candidate: { include: { optionSelections: true } }, review: true, strategyVersion: { include: { strategy: true } } } });
+  return prisma.trade.findMany({ where: { ownerId, createdAt: { gte: since } }, orderBy: { createdAt: "asc" }, include: { candidate: { include: { optionSelections: true } }, review: true, strategyVersion: { include: { strategy: true } } } });
 });
 
 const title = (value: string) => value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -39,17 +42,17 @@ const formatR = (value: number | null | undefined) => value == null ? "—" : `$
 const stamp = (value: Date) => new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(value);
 
 export default async function Home({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  await guardPage();
+  const ownerId = await guardPage();
   const now = new Date();
   const filters = dashboardFilters(await searchParams, now); const selectedRange = dateRange(filters, now);
   const [strategy, plans, candidates, allTrades, audits, drafts, versions] = await Promise.all([
-    cachedStrategy(),
-    prisma.dailyPlan.findMany({ where: { status: "ACTIVE" }, orderBy: { updatedAt: "desc" }, include: { instruments: true } }),
-    prisma.setupCandidate.findMany({ orderBy: { updatedAt: "desc" }, take: 20, include: { gateAssessment: true, grade: true, trade: true, evidence: true } }),
-    cachedTrades(),
-    prisma.auditEvent.findMany({ orderBy: { timestamp: "desc" }, take: 7 }),
-    cachedDrafts(),
-    cachedVersions(),
+    cachedStrategy(ownerId),
+    prisma.dailyPlan.findMany({ where: { ownerId, status: "ACTIVE" }, orderBy: { updatedAt: "desc" }, include: { instruments: true } }),
+    prisma.setupCandidate.findMany({ where: { ownerId }, orderBy: { updatedAt: "desc" }, take: 20, include: { gateAssessment: true, grade: true, trade: true, evidence: true } }),
+    cachedTrades(ownerId),
+    prisma.auditEvent.findMany({ where: { ownerId }, orderBy: { timestamp: "desc" }, take: 7 }),
+    cachedDrafts(ownerId),
+    cachedVersions(ownerId),
   ]);
   const plan = plans.find((item) => (!filters.account || item.account === filters.account) && (!filters.version || item.strategyVersionId === filters.version)) ?? plans[0];
   const filterTrade = (trade: typeof allTrades[number]) => {

@@ -87,6 +87,8 @@ a:hover { text-decoration: none; }
 .login-card { width: min(100%, 390px); }
 .login-card h1 { margin: 0 0 6px; font: 600 21px/1.2 var(--mono); }
 .login-form { display: grid; gap: 12px; margin-top: 22px; }
+.auth-alt { margin: 16px 0 0; font-size: 12px; }
+.auth-alt a { color: var(--accent-primary); font-weight: 600; }
 .evidence-controls { margin-top: 14px; }
 .evidence-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-top: 12px; }
 .evidence-grid figure { margin: 0; border: 1px solid var(--border-subtle); background: var(--surface-secondary); }
