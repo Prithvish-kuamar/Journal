@@ -21,8 +21,11 @@ export async function ensureWorkspace(ownerId: string) {
   if (await prisma.strategy.count({ where: { ownerId } })) return;
 
   await prisma.$transaction(async (tx) => {
-    // Re-check inside the transaction: two parallel first-load requests would
-    // otherwise both pass the count above and seed two strategies.
+    // Serialise concurrent first loads for this account. A plain re-read is not
+    // enough — under read-committed both requests would see zero and seed twice.
+    // Transaction-scoped so it releases on commit, and safe through pgbouncer's
+    // transaction pooling in a way a session-level lock would not be.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${ownerId}))`;
     if (await tx.strategy.count({ where: { ownerId } })) return;
 
     const strategy = await tx.strategy.create({ data: { ownerId, name: "LTA Evidence Ledger", description: "Configure gate doctrine, entry models, and grade categories before trading." } });
@@ -43,5 +46,11 @@ export async function ensureWorkspace(ownerId: string) {
       const spec = FUTURES_SPECS[option.label];
       return { strategyVersionId, symbol: option.label.replaceAll("/", ""), displayName: option.label, aliases: option.label === "XAU/USD" ? JSON.stringify(["XAUUSD"]) : null, assetClass: isFutures ? "FUTURES" : option.label === "BTC/USD" ? "CRYPTO" : option.label.startsWith("X") ? "METAL" : "FOREX", tradingFormat: isFutures ? "FUTURES" : "SPOT", quoteCurrency: option.label.includes("/") ? option.label.split("/")[1] : "USD", calculationSupported: Boolean(spec), tickSize: spec?.tickSize ?? null, tickValue: spec?.tickValue ?? null, metadataNotes: spec ? null : "Owner configuration required — values are never guessed." };
     }) });
+  }, {
+    // Nine statements, two of them multi-hundred-row inserts, against a DB that
+    // may be a continent away. Prisma's 5s default closes the transaction
+    // mid-seed and the tail statements fail with "Transaction not found".
+    timeout: 30_000,
+    maxWait: 10_000,
   });
 }
